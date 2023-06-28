@@ -6,8 +6,12 @@ module Sound.Tidal.KeyChords where
    a lot of music theory.
 -}
 
-import Data.Maybe
-import Sound.Tidal.Pattern
+import Sound.Tidal.Types
+
+-- RChord type
+data RChord = RChord { root :: Note
+                     , noteList :: [Note]
+                     } deriving (Show)
 
 
 -- keyChords takes a Pattern Int and converts it to a Pattern Note that will
@@ -18,5 +22,4 @@ import Sound.Tidal.Pattern
 -- i.e. Amaj, Bmin, Dmaj, Emaj
 -- Note in particular that it is not necessary to know that the ii chord of a 
 -- major key is minor in order to stay in the key.
---keyChords :: String -> String -> Pattern Int -> Pattern Note
 
