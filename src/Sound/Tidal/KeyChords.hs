@@ -28,9 +28,38 @@ data RKey = RKey { tonic :: Note
 -- and contructs an RKey
 strRKey :: Note -> String -> RKey
 strRKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
-                           then RKey ton (fromJust jMode)
-                           else error "Mode not available"
-                        where jMode = lookup modeStr scaleTable 
+                         then RKey {tonic = ton, mode = (fromJust jMode)}
+                         else error "Mode not available"
+                      where jMode = lookup modeStr scaleTable 
+
+-- sclDegTriad takes an RKey key and an Int sclDeg
+-- and returns an RChord which is a triad built in the given key
+-- on the given scale degree
+sclDegTriad :: RKey -> Int -> RChord
+sclDegTriad key sclDeg = RChord {root = r, noteList = nL}
+                         where
+                            -- find the root
+                            r = sclDegGetNote key sclDeg
+                            -- find the third and fifth
+                            third = sclDegGetNote key (sclDeg + 2)
+                            fifth = sclDegGetNote key (sclDeg + 4)
+                            -- put the noteList together
+                            nL = r:third:fifth:[]
+
+-- sclDegGetNote takes an RKey key and an Int sclDeg
+-- and returns the Note corresponding to that scale degree in that key
+-- note that it pays attention to octaves,
+-- so if the root of key is c4, and you ask for the 8th scale degree
+-- sclDegGetNote will return c5
+sclDegGetNote :: RKey -> Int -> Note
+sclDegGetNote key sclDeg = Note $ (mode key)!!ind + 12*oct
+                           where
+                              len = length $ mode key
+                              -- (sclDeg - 1) because lists are indexed from 0,
+                              -- but scale degree is traditionally indexed
+                              -- from 1
+                              oct = fromIntegral $ (sclDeg - 1) `div` len -- octave adjustment
+                              ind = (sclDeg - 1) `mod` len -- index in the mode
 
 -- keyChords takes a Pattern Int and converts it to a Pattern Note that will
 -- play the corresponding chords in the specified key.
