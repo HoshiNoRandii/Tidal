@@ -7,12 +7,14 @@ module Sound.Tidal.KeyChords where
 -}
 
 import Data.Maybe
+import Data.List
 import Sound.Tidal.Types
 import Sound.Tidal.Scales
 
 -- RChord type
 -- includes the root of the chord
 -- and a list of notes in the chord
+-- entries in noteList should be in order of ascending pitch
 data RChord = RChord { root :: Note
                      , noteList :: [Note]
                      } deriving (Show)
@@ -35,6 +37,7 @@ strRKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
 -- sclDegTriad takes an RKey key and an Int sclDeg
 -- and returns an RChord which is a triad built in the given key
 -- on the given scale degree
+-- notes in the noteList are in ascending order
 sclDegTriad :: RKey -> Int -> RChord
 sclDegTriad key sclDeg = RChord {root = r, noteList = nL}
                          where
@@ -60,6 +63,17 @@ sclDegGetNote key sclDeg = Note $ (mode key)!!ind + 12*oct
                               -- from 1
                               oct = fromIntegral $ (sclDeg - 1) `div` len -- octave adjustment
                               ind = (sclDeg - 1) `mod` len -- index in the mode
+
+-- invertRChord takes the lowest pitch of an RChord and raises it an octave,
+-- then resorts the noteList to maintain the ascending pitch order 
+invertRChord :: RChord -> RChord
+invertRChord chord = RChord {root = r, noteList = nL}
+                     where
+                        r = root chord -- the root stays the same
+                        -- put the lowest note in its own one-element list
+                        -- and the remaining notes in a separate list
+                        (lowest, remaining) = splitAt 1 (noteList chord)
+                        nL = sort $ remaining ++ [lowest!!0 + 12]
 
 -- keyChords takes a Pattern Int and converts it to a Pattern Note that will
 -- play the corresponding chords in the specified key.
