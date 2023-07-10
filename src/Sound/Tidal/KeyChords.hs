@@ -9,6 +9,7 @@ module Sound.Tidal.KeyChords where
 import Data.Maybe
 import Sound.Tidal.Types
 import Sound.Tidal.Scales
+import Sound.Tidal.Pattern
 
 ------ types, classes, and related functions ------
 
@@ -75,10 +76,10 @@ data KeyChord = KeyChord { key :: Key
 
 -- DCMod type
 -- modifiers for DegChords
-data DCMod = Invert
+data DCMod = DInvert
 
 instance Show DCMod where
-   show Invert = "Invert"
+   show DInvert = "DegChord Invert"
 
 
 ------ main functions ------
@@ -130,3 +131,33 @@ invertDChord chord = DegChord {degRoot = r, degList = dL}
 
 ------ functions that interface with the parser ------
 
+-- degChordToPatSeq takes a Pattern of numbers representing scale degrees
+-- and a list of Patterns of lists of DCMods
+-- and returns a Pattern of DegChords which have been modified
+degChordToPatSeq :: (Num a, Enum a, Integral a, Pattern t) => t a -> [t [DCMod]] -> t DegChord 
+degChordToPatSeq degP modsP = do
+                                 d <- patNumToDeg degP
+                                 let ch = degTriad d
+                                 applyDCModPatSeq (return ch) modsP 
+
+-- patNumToDeg converts a Pattern of numbers to a Pattern of Degrees
+patNumToDeg :: (Num a, Enum a, Integral a, Pattern t) => t a -> t Degree
+patNumToDeg pat = fmap ((\x -> Degree {deg = x, octs = 0}).fromIntegral) pat
+
+-- applyDCModPatSeq applies a List of Patterns of Lists of DCMods
+-- to a Pattern of DegChords
+applyDCModPatSeq :: (Pattern t) => t DegChord -> [t [DCMod]] -> t DegChord
+applyDCModPatSeq pat [] = pat
+applyDCModPatSeq pat (mP:msP) = applyDCModPatSeq (applyDCModPat pat mP) msP
+
+-- applyDCModPat applies a Pattern of Lists of DCMods
+-- to a Pattern of DegChords
+applyDCModPat :: (Pattern t) => t DegChord -> t [DCMod] -> t DegChord
+applyDCModPat pat modsP = do
+                            dch <- pat
+                            ms <- modsP 
+                            return $ (foldl (flip applyDCMod) dch) ms 
+
+-- applyDCMod applies a DCMod to a DegChord
+applyDCMod :: DCMod -> DegChord -> DegChord
+applyDCMod DInvert = invertDChord

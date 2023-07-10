@@ -51,6 +51,8 @@ import           Sound.Tidal.Signal.Random              (_degradeByUsing,
 import           Sound.Tidal.Types
 import           Sound.Tidal.Utils                      (fromRight)
 import           Sound.Tidal.Value
+-- customized
+import           Sound.Tidal.KeyChords
 
 data TidalParseError = TidalParseError {parsecError :: ParseError,
                                         code        :: String
@@ -85,6 +87,11 @@ data TPat a where
    TPat_EnumFromTo :: TPat a -> TPat a -> TPat a
    TPat_Var :: String -> TPat a
    TPat_Chord :: (Num b, Enum b, Parseable b, Enumerable b) => (b -> a) -> TPat b -> TPat String -> [TPat [Modifier]] -> TPat a
+   -- customized
+   -- TPat Int, [TPat [DCMod]] -> TPat DChord
+   -- TPat_DChord (scale degrees) ([modifiers])
+   -- notice that the scale degrees here are numbers, not Degrees
+   TPat_DChord :: (Num b, Enum b, Parseable b, Enumerable b) => TPat b -> [TPat [DCMod]] -> TPat a
 
 instance Show a => Show (TPat a) where
   show (TPat_Atom c v) = "TPat_Atom (" ++ show c ++ ") (" ++ show v ++ ")"
@@ -102,6 +109,8 @@ instance Show a => Show (TPat a) where
   show (TPat_EnumFromTo a b) = "TPat_EnumFromTo (" ++ show a ++ ") (" ++ show b ++ ")"
   show (TPat_Var s) = "TPat_Var " ++ show s
   show (TPat_Chord g iP nP msP) = "TPat_Chord (" ++ show (fmap g iP) ++ ") (" ++ show nP ++ ") (" ++ show msP ++ ")"
+  -- customized
+  show (TPat_DChord degsP modsP) = "TPat_DChord (" ++ show degsP ++ ") (" ++ show modsP ++ ")"
 
 instance Functor TPat where
   fmap f (TPat_Atom c v) = TPat_Atom c (f v)
@@ -119,6 +128,9 @@ instance Functor TPat where
   fmap f (TPat_EnumFromTo a b) = TPat_EnumFromTo (fmap f a) (fmap f b)
   fmap _ (TPat_Var s) = TPat_Var s
   fmap f (TPat_Chord g iP nP msP) = TPat_Chord (f . g) iP nP msP
+  -- customized
+  -- TODO: is this an appropriate fmap?
+  fmap f (TPat_DChord degsP modsP) = TPat_DChord (fmap f degsP) modsP 
 
 tShowList :: (Show a) => [TPat a] -> String
 tShowList vs = "[" ++ intercalate "," (map tShow vs) ++ "]"
@@ -150,6 +162,9 @@ tShow (TPat_EnumFromTo a b) = "mixJoin $ fromTo <$> (" ++ tShow a ++ ") <*> (" +
 tShow (TPat_Var s) = "getControl " ++ s
 tShow (TPat_Chord f n name mods) = "chord (" ++ tShow (fmap f n) ++ ") (" ++ tShow name ++ ")" ++ tShowList mods
 tShow a = "can't happen? " ++ show a
+-- customized
+tShow (TPat_DChord degsP modsP) = "degchord (" ++ tShow degsP ++ ") (" ++ tShowList modsP ++ ")"
+
 
 
 toPat :: (Parseable a, Enumerable a) => TPat a -> Signal a
@@ -177,6 +192,8 @@ toPat = \case
    TPat_Chord f iP nP mP -> chordToPatSeq f (toPat iP) (toPat nP) (map toPat mP)
    p@(TPat_Repeat _ _) -> toPat $ TPat_Seq [p] --this is a bit of a hack
    _ -> silence
+   -- customized
+   TPat_DChord degsP modsP -> degChordToPatSeq (toPat degsP) (map toPat modsP)
 
 
 toSeq :: (Parseable a, Enumerable a) => TPat a -> Sequence a
@@ -457,10 +474,12 @@ pFloat = do
 intOrFloat :: MyParser Double
 intOrFloat = try pFloat <|> pInteger
 
+-- customized
 pDouble :: MyParser (TPat Double)
 pDouble = try $ do d <- pDoubleWithoutChord
-                   pChord d <|> return d
+                   pChord d <|> pDChord d <|> return d
                 <|> pChord (TPat_Atom Nothing 0)
+                <|> pDChord (TPat_Atom Nothing 0)
                 <|> pDoubleWithoutChord
 
 pDoubleWithoutChord :: MyParser (TPat Double)
@@ -468,10 +487,12 @@ pDoubleWithoutChord = pTPatF $ wrapPos $ do s <- sign
                                             f <- choice [fromRational <$> pRatio, parseNote] <?> "float"
                                             return $ TPat_Atom Nothing (applySign s f)
 
+-- customized
 pNote :: MyParser (TPat Note)
 pNote = try $ do n <- pNoteWithoutChord
-                 pChord n <|> return n
+                 pChord n <|> pDChord n <|> return n
         <|> pChord (TPat_Atom Nothing 0)
+        <|> pDChord (TPat_Atom Nothing 0)
         <|> pNoteWithoutChord
         <|> do TPat_Atom Nothing . fromRational <$> pRatio
 
@@ -513,10 +534,12 @@ parseIntNote = do s <- sign
 pIntegralWithoutChord :: (Integral a, Parseable a, Enumerable a) => MyParser (TPat a)
 pIntegralWithoutChord = pTPatF $ wrapPos $ fmap (TPat_Atom Nothing) parseIntNote
 
+-- customized
 pIntegral :: (Integral a, Parseable a, Enumerable a) => MyParser (TPat a)
 pIntegral = try $ do i <- pIntegralWithoutChord
-                     pChord i <|> return i
+                     pChord i <|> pDChord i <|> return i
             <|> pChord (TPat_Atom Nothing 0)
+            <|> pDChord (TPat_Atom Nothing 0)
             <|> pIntegralWithoutChord
 
 fromNote :: Num a => Signal String -> Signal a
@@ -766,3 +789,40 @@ pChord i = do
     n <- pTPat <?> "chordname"
     ms <- option [] $ many1 (char '\'' >> pTPat)
     return $ TPat_Chord id i n ms
+
+-- customized
+-- parsing DegChords
+
+instance Parseable DegChord where
+   tPatParser = pDChord
+   doEuclid = euclidOff
+
+instance Enumerable DegChord where
+   fromTo a b = fastFromList [a,b]
+   fromThenTo a b c = fastFromList [a,b,c]
+
+
+pDChord :: (Enum a, Num a, Parseable a, Enumerable a) => TPat a -> MyParser (TPat a)
+pDChord i = do
+   char '!'
+   ms <- option [] $ many1 (char '!' >> pTPat)
+   return $ TPat_DChord i ms
+
+instance Parseable [DCMod] where
+   tPatParser = pDCMods
+   doEuclid = euclidOff
+
+instance Enumerable [DCMod] where
+   fromTo a b = fastFromList [a,b]
+   fromThenTo a b c = fastFromList [a,b,c]
+
+pDCMods:: MyParser (TPat [DCMod])
+pDCMods = wrapPos $ TPat_Atom Nothing <$> parseDCMods
+
+parseDCMods:: MyParser [DCMod]
+parseDCMods = many1 parseDCModInv <?> "modifier"
+
+parseDCModInv :: MyParser DCMod 
+parseDCModInv = char 'i' >> return DInvert
+
+
