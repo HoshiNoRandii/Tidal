@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs             #-}
+
 module Sound.Tidal.KeyChords where
 
 {-
@@ -134,21 +137,21 @@ invertDChord chord = DegChord {degRoot = r, degList = dL}
 -- degChordToPatSeq takes a Pattern of numbers representing scale degrees
 -- and a list of Patterns of lists of DCMods
 -- and returns a Pattern of DegChords which have been modified
-degChordToPatSeq :: (Num a, Enum a, Integral a, Pattern t) => t a -> [t [DCMod]] -> t DegChord 
-degChordToPatSeq degP modsP = do
+degChordToPatSeq :: (Pattern t) => (DegChord -> a) -> t Int -> [t [DCMod]] -> t a 
+degChordToPatSeq f degP modsP = do
                                  d <- patNumToDeg degP
                                  let ch = degTriad d
-                                 applyDCModPatSeq (return ch) modsP 
+                                 applyDCModPatSeq f (return ch) modsP 
 
--- patNumToDeg converts a Pattern of numbers to a Pattern of Degrees
-patNumToDeg :: (Num a, Enum a, Integral a, Pattern t) => t a -> t Degree
-patNumToDeg pat = fmap ((\x -> Degree {deg = x, octs = 0}).fromIntegral) pat
+-- patNumToDeg converts a Pattern of Ints to a Pattern of Degrees
+patNumToDeg :: (Pattern t) => t Int -> t Degree
+patNumToDeg pat = fmap (\x -> Degree {deg = x, octs = 0}) pat
 
 -- applyDCModPatSeq applies a List of Patterns of Lists of DCMods
 -- to a Pattern of DegChords
-applyDCModPatSeq :: (Pattern t) => t DegChord -> [t [DCMod]] -> t DegChord
-applyDCModPatSeq pat [] = pat
-applyDCModPatSeq pat (mP:msP) = applyDCModPatSeq (applyDCModPat pat mP) msP
+applyDCModPatSeq :: (Pattern t) => (DegChord -> a) -> t DegChord -> [t [DCMod]] -> t a
+applyDCModPatSeq f pat [] = fmap f pat
+applyDCModPatSeq f pat (mP:msP) = applyDCModPatSeq f (applyDCModPat pat mP) msP
 
 -- applyDCModPat applies a Pattern of Lists of DCMods
 -- to a Pattern of DegChords
