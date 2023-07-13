@@ -799,11 +799,9 @@ pDChord :: MyParser (TPat DegChord)
 pDChord = try $ do 
                   i <- pIntegralWithoutChord :: (MyParser (TPat Int))
                   parseDChord i 
-                  <|> parseDChord (TPat_Atom Nothing (0 :: Int))
 
 parseDChord :: TPat Int -> MyParser (TPat DegChord)
 parseDChord i = do
-   char '-'
    ms <- option [] $ many1 (char '-' >> pTPat)
    return $ TPat_DChord id i ms
 
