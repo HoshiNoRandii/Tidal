@@ -13,6 +13,7 @@ import Data.Maybe
 import Sound.Tidal.Types
 import Sound.Tidal.Scales
 import Sound.Tidal.Pattern
+import Sound.Tidal.Params
 
 ------ types, classes, and related functions ------
 
@@ -49,6 +50,18 @@ data DegChord = DegChord { degRoot :: Degree
                          , degList :: [Degree]
                          } deriving (Show)
 
+-- degTriad takes a Degree sclDeg
+-- and returns a DegChord which is a triad built 
+-- on the given scale degree
+-- entries in degList are in ascending order
+degTriad :: Degree -> DegChord
+degTriad sclDeg = DegChord { degRoot = sclDeg
+                           , degList = sclDeg:third:fifth:[]
+                           }
+                  where
+                     third = sclDeg `degAdd` 2
+                     fifth = sclDeg `degAdd` 4 
+
 -- Key type
 -- includes the tonic and the "scale" (mode)
 data Key = Key { tonic :: Note
@@ -65,17 +78,6 @@ strKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
                          else error "Mode not available"
                      where jMode = lookup modeStr scaleTable 
 
--- KeyChord type
--- includes the key,
--- the root of the chord and its degree rootDeg,
--- and a list of notes in the chord
--- entries in noteList should be in order of ascending pitch
-data KeyChord = KeyChord { key :: Key
-                         , rootDeg :: Degree
-                         , root :: Note
-                         , noteList :: [Note]
-                         } deriving (Show)
-
 
 -- DCMod type
 -- modifiers for DegChords
@@ -87,26 +89,41 @@ instance Show DCMod where
 
 ------ main functions ------
 
--- degTriad takes a Degree sclDeg
--- and returns a DegChord which is a triad built 
--- on the given scale degree
--- entries in degList are in ascending order
-degTriad :: Degree -> DegChord
-degTriad sclDeg = DegChord { degRoot = sclDeg
-                           , degList = sclDeg:third:fifth:[]
-                           }
-                  where
-                     third = sclDeg `degAdd` 2
-                     fifth = sclDeg `degAdd` 4 
-                            
+-- keyChords takes a Pattern of Notes indicating tonics,
+-- a Pattern of Strings indicating modes,
+-- and a Pattern of DegChords
+-- and returns a Pattern ValueMap
+keyChords :: (Pattern t) => t Note -> t String -> t DegChord -> t ValueMap 
+keyChords tonP modeP chordP = note $ patKeyDCToNotes keyP chordP
+                              where
+                                 keyP = patKey tonP modeP 
+
+-- patKey takes a Pattern of Notes indicating tonics
+-- and a Pattern of Strings indicating modes
+-- and returns a Pattern of Keys
+patKey :: (Pattern t) => t Note -> t String -> t Key
+patKey tonP modeP = (strKey <$> tonP) <*> modeP
+
+-- patKeyDCToNotes takes a Pattern of Keys to pass to
+-- patDegChordToNotes
+patKeyDCToNotes :: (Pattern t) => t Key -> t DegChord -> t Note
+patKeyDCToNotes keyP chordP = uncollect $
+                              (degChordToNoteList <$> keyP) <*> chordP 
+
+-- degChordToNoteList takes a DegChord and converts it to a list of Notes
+-- representing the appropriate chord in the given Key
+degChordToNoteList :: Key -> DegChord -> [Note]
+degChordToNoteList key chord = map (sclDegGetNote key) (degList chord)
+
 -- sclDegGetNote takes a Key key and a Degree sclDeg
 -- and returns the Note corresponding to that scale degree in that key
 -- note that it pays attention to octaves,
 -- so if the key is c4 major, and you ask for the 8th scale degree
 -- sclDegGetNote will return c5
 sclDegGetNote :: Key -> Degree -> Note
-sclDegGetNote k sclDeg = Note $ (mode k)!!ind + 12*oct
+sclDegGetNote k sclDeg = Note $ ton + (mode k)!!ind + 12*oct
                            where
+                              ton = unNote $ tonic k
                               len = length $ mode k
                               d = deg sclDeg
                               -- (deg - 1) because lists are indexed from 0,
@@ -115,6 +132,8 @@ sclDegGetNote k sclDeg = Note $ (mode k)!!ind + 12*oct
                               oct = fromIntegral $ ((d - 1) `div` len)
                                        + (octs sclDeg) -- octave adjustment
                               ind = (d - 1) `mod` len -- index in the mode
+
+------ modifier functions ------
 
 -- invertDChord takes the first entry in the degList of a DegChord,
 -- raises it an octave, and moves it to the end of the degList
@@ -131,6 +150,7 @@ invertDChord chord = DegChord {degRoot = r, degList = dL}
                         r = if first == degRoot chord
                                then firstUp
                                else degRoot chord
+
 
 ------ functions that interface with the parser ------
 
