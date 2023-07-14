@@ -817,9 +817,19 @@ pDCMods:: MyParser (TPat [DCMod])
 pDCMods = wrapPos $ TPat_Atom Nothing <$> parseDCMods
 
 parseDCMods:: MyParser [DCMod]
-parseDCMods = many1 parseDCModInv <?> "modifier"
+parseDCMods = try parseDCModInvNum <|> many1 parseDCModInv 
+                 <|> many1 parseDCModOpen <?> "modifier"
 
 parseDCModInv :: MyParser DCMod 
 parseDCModInv = char 'i' >> return DInvert
+
+parseDCModInvNum :: MyParser [DCMod]
+parseDCModInvNum = do
+              char 'i'
+              n <- pInteger
+              return $ replicate (round n) DInvert
+
+parseDCModOpen :: MyParser DCMod 
+parseDCModOpen = char 'o' >> return DOpen
 
 

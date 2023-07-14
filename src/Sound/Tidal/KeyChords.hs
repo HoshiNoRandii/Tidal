@@ -9,11 +9,13 @@ module Sound.Tidal.KeyChords where
    a lot of music theory.
 -}
 
-import Data.Maybe
-import Sound.Tidal.Types
-import Sound.Tidal.Scales
-import Sound.Tidal.Pattern
-import Sound.Tidal.Params
+import           Data.Maybe
+import           Data.List
+import qualified Data.PartialOrd     as PO
+import           Sound.Tidal.Types
+import           Sound.Tidal.Scales
+import           Sound.Tidal.Pattern
+import           Sound.Tidal.Params
 
 ------ types, classes, and related functions ------
 
@@ -41,6 +43,10 @@ octAdd d i = Degree {deg = newDeg, octs = newOcts}
 -- degrees can be compared
 instance Eq Degree where 
    (Degree d1 o1) == (Degree d2 o2) = (d1 == d2) && (o1 == o2)
+
+instance PO.PartialOrd Degree where
+   (Degree d1 o1) <= (Degree d2 o2) = (d1 == d2) && (o1 <= o2)
+   (Degree d1 o1) <= (Degree d2 o2) = (o1 == o2) && (d1 <= d2)
 
 -- DegChord type
 -- a chord of scale degrees
@@ -81,10 +87,11 @@ strKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
 
 -- DCMod type
 -- modifiers for DegChords
-data DCMod = DInvert
+data DCMod = DInvert | DOpen deriving Eq
 
 instance Show DCMod where
    show DInvert = "DegChord Invert"
+   show DOpen = "DegChord Open"
 
 
 ------ main functions ------
@@ -133,6 +140,7 @@ sclDegGetNote k sclDeg = Note $ ton + (mode k)!!ind + 12*oct
                                        + (octs sclDeg) -- octave adjustment
                               ind = (d - 1) `mod` len -- index in the mode
 
+
 ------ modifier functions ------
 
 -- invertDChord takes the first entry in the degList of a DegChord,
@@ -150,6 +158,41 @@ invertDChord chord = DegChord {degRoot = r, degList = dL}
                         r = if first == degRoot chord
                                then firstUp
                                else degRoot chord
+
+-- openDChord takes a DegChord and spreads the entries in the degList
+-- further from each other
+openDChord :: DegChord -> DegChord
+openDChord chord = DegChord {degRoot = r, degList = dL}
+                   where
+                      oldDL = degList chord
+                      len = length oldDL
+                      -- split the list roughly in half with a single
+                      -- element in the center
+                      splitInd = len `quot` 2
+                      (down, stay:up) = splitAt splitInd oldDL
+                      dL = (spreadDown down) ++ [stay] ++ (spreadUp up)
+                      -- grab the deg from the original root
+                      rDeg = deg (degRoot chord)
+                      -- grab all instances of the root deg in dL
+                      roots = filter (\x -> deg x == rDeg) dL
+                      -- grab the lowest to set to the new root
+                      -- (even though Degrees are partially ordered,
+                      -- within the same deg they are totally ordered)
+                      r = (PO.minima roots)!!0
+
+-- spreadDown takes a List of Degrees and spreads them out
+-- by lowering them by octaves
+-- entries earlier in the list are lowered more
+spreadDown :: [Degree] -> [Degree]
+spreadDown [] = []
+spreadDown chords = (spreadDown (init chords)) ++ [(last chords) `octAdd` (-1)]
+
+-- spreadUp takes a List of Degrees and spreads them out
+-- by raising them by octaves
+-- entries later in the list are raised more
+spreadUp :: [Degree] -> [Degree]
+spreadUp [] = []
+spreadUp chords = [(head chords) `octAdd` 1] ++ (spreadUp (tail chords))
 
 
 ------ functions that interface with the parser ------
@@ -184,3 +227,4 @@ applyDCModPat pat modsP = do
 -- applyDCMod applies a DCMod to a DegChord
 applyDCMod :: DCMod -> DegChord -> DegChord
 applyDCMod DInvert = invertDChord
+applyDCMod DOpen = openDChord
