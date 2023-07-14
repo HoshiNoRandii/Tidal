@@ -87,11 +87,12 @@ strKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
 
 -- DCMod type
 -- modifiers for DegChords
-data DCMod = DInvert | DOpen deriving Eq
+data DCMod = DInvert | DOpen | DPower deriving Eq
 
 instance Show DCMod where
    show DInvert = "DegChord Invert"
    show DOpen = "DegChord Open"
+   show DPower = "Power DegChord"
 
 
 ------ main functions ------
@@ -201,14 +202,23 @@ openDChord chord = DegChord {degRoot = r, degList = dL}
 -- entries earlier in the list are lowered more
 spreadDown :: [Degree] -> [Degree]
 spreadDown [] = []
-spreadDown chords = (spreadDown (init chords)) ++ [(last chords) `octAdd` (-1)]
+spreadDown degs = (spreadDown (init degs)) ++ [(last degs) `octAdd` (-1)]
 
 -- spreadUp takes a List of Degrees and spreads them out
 -- by raising them by octaves
 -- entries later in the list are raised more
 spreadUp :: [Degree] -> [Degree]
 spreadUp [] = []
-spreadUp chords = [(head chords) `octAdd` 1] ++ (spreadUp (tail chords))
+spreadUp degs = [(head degs) `octAdd` 1] ++ (spreadUp (tail degs))
+
+-- powerDChord removes all instances of the scale degree 2 higher than
+-- the root (the "third") from the degList of the given DegChord
+powerDChord :: DegChord -> DegChord
+powerDChord chord = DegChord {degRoot = r, degList = dL}
+                    where
+                       r = degRoot chord
+                       dr = deg r
+                       dL = filter (\x -> deg x /= dr + 2) (degList chord)
 
 
 ------ functions that interface with the parser ------
@@ -244,3 +254,4 @@ applyDCModPat pat modsP = do
 applyDCMod :: DCMod -> DegChord -> DegChord
 applyDCMod DInvert = invertDChord
 applyDCMod DOpen = openDChord
+applyDCMod DPower = powerDChord
