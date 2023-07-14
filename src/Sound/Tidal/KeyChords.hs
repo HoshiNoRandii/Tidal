@@ -87,12 +87,14 @@ strKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
 
 -- DCMod type
 -- modifiers for DegChords
-data DCMod = DInvert | DOpen | DPower deriving Eq
+data DCMod = DInvert | DOpen | DPower | DUp | DDown deriving Eq
 
 instance Show DCMod where
    show DInvert = "DegChord Invert"
    show DOpen = "DegChord Open"
    show DPower = "Power DegChord"
+   show DUp = "DegChord Octave Up"
+   show DDown = "DegChord Octave Down"
 
 
 ------ main functions ------
@@ -220,6 +222,20 @@ powerDChord chord = DegChord {degRoot = r, degList = dL}
                        dr = deg r
                        dL = filter (\x -> deg x /= dr + 2) (degList chord)
 
+-- degChordUp raises all notes in a DegChord by an octave
+degChordUp :: DegChord -> DegChord
+degChordUp chord = DegChord {degRoot = r, degList = dL}
+                   where
+                      r = degRoot chord
+                      dL = map (flip octAdd 1) (degList chord)
+
+-- degChordDown lowers all notes in a DegChord by an octave
+degChordDown :: DegChord -> DegChord
+degChordDown chord = DegChord {degRoot = r, degList = dL}
+                   where
+                      r = degRoot chord
+                      dL = map (flip octAdd (-1)) (degList chord)
+
 
 ------ functions that interface with the parser ------
 
@@ -255,3 +271,5 @@ applyDCMod :: DCMod -> DegChord -> DegChord
 applyDCMod DInvert = invertDChord
 applyDCMod DOpen = openDChord
 applyDCMod DPower = powerDChord
+applyDCMod DUp = degChordUp
+applyDCMod DDown = degChordDown
