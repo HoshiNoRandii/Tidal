@@ -127,8 +127,11 @@ degChordToNoteList key chord = map (sclDegGetNote key) (degList chord)
 -- note that it pays attention to octaves,
 -- so if the key is c4 major, and you ask for the 8th scale degree
 -- sclDegGetNote will return c5
+-- sclDegGetNote will not return Notes that are too low or high to have
+-- a MIDI number, and will instead bring them up or down octaves until
+-- they are within MIDI playable range
 sclDegGetNote :: Key -> Degree -> Note
-sclDegGetNote k sclDeg = Note $ ton + (mode k)!!ind + 12*oct
+sclDegGetNote k sclDeg = midiPlayable $ Note $ ton + (mode k)!!ind + 12*oct
                            where
                               ton = unNote $ tonic k
                               len = length $ mode k
@@ -139,6 +142,19 @@ sclDegGetNote k sclDeg = Note $ ton + (mode k)!!ind + 12*oct
                               oct = fromIntegral $ ((d - 1) `div` len)
                                        + (octs sclDeg) -- octave adjustment
                               ind = (d - 1) `mod` len -- index in the mode
+
+-- midiPlayable takes a Note and
+-- if the note is within MIDI playable range, returns it
+-- and if it is not, moves it up or down octaves until it is
+midiPlayable :: Note -> Note
+midiPlayable n
+   | (-72) <= n && n <= 55 = n -- the note is MIDI playable, return it
+   | n < (-72)             = midiPlayable (n + 12) -- the note is too low,
+                                                   -- raise it an octave
+                                                   -- and try again
+   | n > 55                = midiPlayable (n - 12) -- the note is too high,
+                                                   -- lower it an octave
+                                                   -- and try again
 
 
 ------ modifier functions ------
