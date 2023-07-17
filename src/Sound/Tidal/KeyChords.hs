@@ -45,8 +45,29 @@ instance Eq Degree where
    (Degree d1 o1) == (Degree d2 o2) = (d1 == d2) && (o1 == o2)
 
 instance PO.PartialOrd Degree where
-   (Degree d1 o1) <= (Degree d2 o2) = (d1 == d2) && (o1 <= o2)
-   (Degree d1 o1) <= (Degree d2 o2) = (o1 == o2) && (d1 <= d2)
+   (Degree d1 o1) <= (Degree d2 o2) =  ((d1 == d2) && (o1 <= o2))
+                                    || ((o1 == o2) && (d1 <= d2))
+
+-- isTopSorted checks if a list of partially ordered elements
+-- is in a valid topological sorting
+isTopSorted :: (PO.PartialOrd a) => [a] -> Bool
+isTopSorted []     = True
+isTopSorted [x]    = True
+isTopSorted (x:xs) = sorted x (xs!!0) && isTopSorted xs
+                     where
+                        sorted a b
+                           | a PO.<= b                 = True
+                           | PO.compare a b == Nothing = True
+                           | otherwise                 = False
+
+-- topSort returns a valid topological sorting of a list of
+-- partially ordered elements
+topSort :: (PO.PartialOrd a) => [a] -> [a]
+topSort [] = []
+topSort list = mins ++ (topSort remaining)
+               where
+                  mins = PO.minima list
+                  remaining = filter (flip PO.notElem mins) list
 
 -- DegChord type
 -- a chord of scale degrees
@@ -122,8 +143,9 @@ patKeyDCToNotes keyP chordP = uncollect $
 
 -- degChordToNoteList takes a DegChord and converts it to a list of Notes
 -- representing the appropriate chord in the given Key
+-- sorts the Notes lowest to highest
 degChordToNoteList :: Key -> DegChord -> [Note]
-degChordToNoteList key chord = map (sclDegGetNote key) (degList chord)
+degChordToNoteList key chord = sort $ map (sclDegGetNote key) (degList chord)
 
 -- sclDegGetNote takes a Key key and a Degree sclDeg
 -- and returns the Note corresponding to that scale degree in that key
@@ -232,10 +254,27 @@ degChordUp chord = DegChord {degRoot = r, degList = dL}
 -- degChordDown lowers all notes in a DegChord by an octave
 degChordDown :: DegChord -> DegChord
 degChordDown chord = DegChord {degRoot = r, degList = dL}
-                   where
-                      r = degRoot chord
-                      dL = map (flip octAdd (-1)) (degList chord)
+                     where
+                        r = degRoot chord
+                        dL = map (flip octAdd (-1)) (degList chord)
 
+-- degChordAddSclDeg adds a new note to a DegChord by scale degree
+-- the new note is added to the octave above the root
+degChordAddSclDeg :: DegChord -> Int -> DegChord
+degChordAddSclDeg chord i = DegChord {degRoot = r, degList = dL}
+                            where
+                               r = degRoot chord
+                               rootDeg = deg r
+                               rootOct = octs r
+                               newDeg  
+                                  | i <= rootDeg 
+                                     = Degree {deg = i, octs = rootOct + 1}
+                                  | i > rootDeg  
+                                     = Degree {deg = i, octs = rootOct} 
+                               newDL = degList chord ++ [newDeg]
+                               dL = if isTopSorted newDL
+                                       then newDL
+                                       else topSort newDL
 
 ------ functions that interface with the parser ------
 
