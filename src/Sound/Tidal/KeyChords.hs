@@ -21,32 +21,47 @@ import           Sound.Tidal.Params
 
 -- Degree type
 -- for indicating scale degree when you don't know what scale you are using
--- includes the degree and an octave adjustment
+-- includes the degree, a semitone adjustment, and  octave adjustment
 data Degree = Degree { deg :: Int
+                     , semi :: Int
                      , octs :: Int
                      } deriving (Show)
 
 -- degAdd function to easily add to the degree field of a Degree
 degAdd :: Degree -> Int -> Degree
-degAdd d i = Degree {deg = newDeg, octs = newOcts}
+degAdd d i = Degree {deg = newDeg, semi = newSemi, octs = newOcts}
              where
                 newDeg = deg d + i
+                newSemi = semi d
                 newOcts = octs d
 
 -- octAdd function to easily add to the octaves field of a Degree
 octAdd :: Degree -> Int -> Degree
-octAdd d i = Degree {deg = newDeg, octs = newOcts}
+octAdd d i = Degree {deg = newDeg, semi = newSemi, octs = newOcts}
              where
                 newDeg = deg d
+                newSemi = semi d
                 newOcts = octs d + i
+
+-- semiAdd function to easily add to the octaves field of a Degree
+semiAdd :: Degree -> Int -> Degree
+semiAdd d i = Degree {deg = newDeg, semi = newSemi, octs = newOcts}
+              where
+                 newDeg = deg d
+                 newSemi = semi d + i
+                 newOcts = octs d 
+
 
 -- degrees can be compared
 instance Eq Degree where 
-   (Degree d1 o1) == (Degree d2 o2) = (d1 == d2) && (o1 == o2)
+   (Degree d1 s1 o1) == (Degree d2 s2 o2) 
+      = (d1 == d2) && (s1 == s2) && (o1 == o2)
 
 instance PO.PartialOrd Degree where
-   (Degree d1 o1) <= (Degree d2 o2) =  ((d1 == d2) && (o1 <= o2))
-                                    || ((o1 == o2) && (d1 <= d2))
+   (Degree d1 s1 o1) <= (Degree d2 s2 o2) 
+      =  ((d1 == d2) && (s1 == s2) && (o1 <= o2))
+      || ((d1 == d2) && (s1 <= s2) && (o1 == o2))
+      || ((d1 <= d2) && (s1 == s2) && (o1 == o2))
 
 -- isTopSorted checks if a list of partially ordered elements
 -- is in a valid topological sorting
@@ -109,7 +124,7 @@ strKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
 -- DCMod type
 -- modifiers for DegChords
 data DCMod = DInvert | DOpen | DPower | DUp | DDown 
-           | DAdd AddWhere Int deriving Eq
+           | DAdd AddWhere (Maybe Int) Int deriving Eq
 
 instance Show DCMod where
    show DInvert = "DegChord Invert"
@@ -117,7 +132,7 @@ instance Show DCMod where
    show DPower = "Power DegChord"
    show DUp = "DegChord Octave Up"
    show DDown = "DegChord Octave Down"
-   show (DAdd x i) = "DegChord Add Scale Degree" ++ show i ++ "to" ++ show x
+   show (DAdd x i st) = "DegChord Add Scale Degree" ++ show i ++ "+" ++ show st ++ "semitones to" ++ show x
 
 -- AddWhere type
 -- to indicate adding tones to the treble or bass of a chord
@@ -267,42 +282,62 @@ degChordDown chord = DegChord {degRoot = r, degList = dL}
                         r = degRoot chord
                         dL = map (flip octAdd (-1)) (degList chord)
 
--- degChordAddSclDeg adds a new note to a DegChord by scale degree
+-- degChordAdd adds a new note to a DegChord by scale degree
+-- and a semitone adjustment
+-- if the given scale degree is Nothing, it defaults to the root
+-- of the given chord
 -- the new note is added to the octave above the root
-degChordAddSclDeg :: DegChord -> Int -> DegChord
-degChordAddSclDeg chord i = DegChord {degRoot = r, degList = dL}
-                            where
-                               r = degRoot chord
-                               rootDeg = deg r
-                               rootOct = octs r
-                               newDeg  
-                                  | i <= rootDeg 
-                                     = Degree {deg = i, octs = rootOct + 1}
-                                  | i > rootDeg  
-                                     = Degree {deg = i, octs = rootOct} 
-                               newDL = degList chord ++ [newDeg]
-                               dL = if isTopSorted newDL
-                                       then newDL
-                                       else topSort newDL
+degChordAdd :: Maybe Int -> Int -> DegChord -> DegChord
+degChordAdd i st chord = DegChord {degRoot = r, degList = dL}
+                         where
+                            r = degRoot chord
+                            rootDeg = deg r
+                            rootOct = octs r
+                            d = if i == Nothing
+                                   then rootDeg
+                                   else fromJust i
+                            newDeg  
+                               | d <= rootDeg 
+                                  = Degree { deg = d
+                                           , semi = st
+                                           , octs = rootOct + 1 }
+                               | d > rootDeg  
+                                  = Degree { deg = d
+                                           , semi = st
+                                           , octs = rootOct } 
+                            newDL = degList chord ++ [newDeg]
+                            dL = if isTopSorted newDL
+                                    then newDL
+                                    else topSort newDL
 
--- degChordAddBassSD adds a new note to a DegChord by scale degree
+-- degChordAddBass adds a new note to a DegChord by scale degree
+-- and a semitone adjustment
+-- if the given scale degree is Nothing, it defaults to the root
+-- of the given chord
 -- the new note is added to the octave below the first note in the 
 -- degList, which should be the lowest note
-degChordAddBassSD :: DegChord -> Int -> DegChord
-degChordAddBassSD chord i = DegChord {degRoot = r, degList = dL}
-                            where
-                               r = degRoot chord
-                               lowest = (degList chord)!!0
-                               lDeg = deg lowest
-                               lOct = octs lowest
-                               newDeg
-                                  | i < lDeg
-                                     = Degree {deg = i, octs = lOct}
-                                  | i >= lDeg
-                                     = Degree {deg = i, octs = lOct - 1}
-                               -- do not need to sort, as this should be the
-                               -- new lowest note
-                               dL = newDeg:(degList chord)
+degChordAddBass :: Maybe Int -> Int -> DegChord -> DegChord
+degChordAddBass i st chord = DegChord {degRoot = r, degList = dL}
+                             where
+                                r = degRoot chord
+                                lowest = (degList chord)!!0
+                                lDeg = deg lowest
+                                lOct = octs lowest
+                                d = if i == Nothing
+                                   then deg r 
+                                   else fromJust i
+                                newDeg
+                                   | d < lDeg
+                                      = Degree { deg = d
+                                               , semi = st
+                                               , octs = lOct }
+                                   | d >= lDeg
+                                      = Degree { deg = d
+                                               , semi = st
+                                               , octs = lOct - 1 }
+                                -- do not need to sort, as this should be the
+                                -- new lowest note
+                                dL = newDeg:(degList chord)
 
 ------ functions that interface with the parser ------
 
@@ -317,7 +352,7 @@ degChordToPatSeq f degP modsP = do
 
 -- patNumToDeg converts a Pattern of Ints to a Pattern of Degrees
 patNumToDeg :: (Pattern t) => t Int -> t Degree
-patNumToDeg pat = fmap (\x -> Degree {deg = x, octs = 0}) pat
+patNumToDeg pat = fmap (\x -> Degree {deg = x, semi = 0, octs = 0}) pat
 
 -- applyDCModPatSeq applies a List of Patterns of Lists of DCMods
 -- to a Pattern of DegChords
@@ -340,5 +375,5 @@ applyDCMod DOpen = openDChord
 applyDCMod DPower = powerDChord
 applyDCMod DUp = degChordUp
 applyDCMod DDown = degChordDown
-applyDCMod (DAdd Treble i) = (flip degChordAddSclDeg) i
-applyDCMod (DAdd Bass i) = (flip degChordAddBassSD) i
+applyDCMod (DAdd Treble i st) = degChordAdd i st
+applyDCMod (DAdd Bass i st) = degChordAddBass i st

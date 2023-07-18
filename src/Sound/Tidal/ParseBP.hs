@@ -837,9 +837,9 @@ parseDCModAddTreb = char 'a' >> parseDCModAddTrebSD
 
 parseDCModAddTrebSD :: MyParser [DCMod]
 parseDCModAddTrebSD = do
-                         char 's'
+                         char 'S'
                          i <- pInteger
-                         return [(DAdd Treble (round i))]
+                         return [(DAdd Treble (Just (round i)) 0)]
 
 parseDCModInv :: MyParser DCMod 
 parseDCModInv = char 'i' >> return DInvert
@@ -876,8 +876,8 @@ parseDCModAddBass = char 'b' >> parseDCModAddBassSD
 
 parseDCModAddBassSD :: MyParser [DCMod]
 parseDCModAddBassSD = do
-                         char 's'
+                         char 'S'
                          i <- pInteger
-                         return [(DAdd Bass (round i))]
+                         return [(DAdd Bass (Just (round i)) 0)]
 
 
