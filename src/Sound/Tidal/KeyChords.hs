@@ -108,7 +108,8 @@ strKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
 
 -- DCMod type
 -- modifiers for DegChords
-data DCMod = DInvert | DOpen | DPower | DUp | DDown deriving Eq
+data DCMod = DInvert | DOpen | DPower | DUp | DDown 
+           | DAdd AddWhere Int deriving Eq
 
 instance Show DCMod where
    show DInvert = "DegChord Invert"
@@ -116,7 +117,15 @@ instance Show DCMod where
    show DPower = "Power DegChord"
    show DUp = "DegChord Octave Up"
    show DDown = "DegChord Octave Down"
+   show (DAdd x i) = "DegChord Add Scale Degree" ++ show i ++ "to" ++ show x
 
+-- AddWhere type
+-- to indicate adding tones to the treble or bass of a chord
+data AddWhere = Treble | Bass deriving Eq
+
+instance Show AddWhere where
+   show Treble = "Treble"
+   show Bass = "Bass"
 
 ------ main functions ------
 
@@ -276,6 +285,25 @@ degChordAddSclDeg chord i = DegChord {degRoot = r, degList = dL}
                                        then newDL
                                        else topSort newDL
 
+-- degChordAddBassSD adds a new note to a DegChord by scale degree
+-- the new note is added to the octave below the first note in the 
+-- degList, which should be the lowest note
+degChordAddBassSD :: DegChord -> Int -> DegChord
+degChordAddBassSD chord i = DegChord {degRoot = r, degList = dL}
+                            where
+                               r = degRoot chord
+                               lowest = (degList chord)!!0
+                               lDeg = deg lowest
+                               lOct = octs lowest
+                               newDeg
+                                  | i < lDeg
+                                     = Degree {deg = i, octs = lOct}
+                                  | i >= lDeg
+                                     = Degree {deg = i, octs = lOct - 1}
+                               -- do not need to sort, as this should be the
+                               -- new lowest note
+                               dL = newDeg:(degList chord)
+
 ------ functions that interface with the parser ------
 
 -- degChordToPatSeq takes a Pattern of numbers representing scale degrees
@@ -312,3 +340,5 @@ applyDCMod DOpen = openDChord
 applyDCMod DPower = powerDChord
 applyDCMod DUp = degChordUp
 applyDCMod DDown = degChordDown
+applyDCMod (DAdd Treble i) = (flip degChordAddSclDeg) i
+applyDCMod (DAdd Bass i) = (flip degChordAddBassSD) i

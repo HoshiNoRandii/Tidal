@@ -802,7 +802,7 @@ pDChord = try $ do
 
 parseDChord :: TPat Int -> MyParser (TPat DegChord)
 parseDChord i = do
-   ms <- option [] $ many1 (char '-' >> pTPat)
+   ms <- option [] $ many1 (char '-' >> pTPat) -- parse modifiers
    return $ TPat_DChord id i ms
 
 instance Parseable [DCMod] where
@@ -813,31 +813,42 @@ instance Enumerable [DCMod] where
    fromTo a b = fastFromList [a,b]
    fromThenTo a b c = fastFromList [a,b,c]
 
-pDCMods:: MyParser (TPat [DCMod])
+pDCMods :: MyParser (TPat [DCMod])
 pDCMods = wrapPos $ TPat_Atom Nothing <$> parseDCMods
 
 parseDCMods:: MyParser [DCMod]
-parseDCMods = parseDCModPower 
-                 <|> try parseDCModInvNum 
-                 <|> many1 parseDCModInv 
-                 <|> many1 parseDCModOpen 
-                 <|> try parseDCModUpNum
-                 <|> many1 parseDCModUp
-                 <|> try parseDCModDownNum
-                 <|> many1 parseDCModDown
-                 <?> "modifier"
+parseDCMods =   parseDCModPower 
+            <|> parseDCModAddTreb
+            <|> try parseDCModInvNum 
+            <|> many1 parseDCModInv 
+            <|> many1 parseDCModOpen 
+            <|> try parseDCModUpNum
+            <|> many1 parseDCModUp
+            <|> try parseDCModDownNum
+            <|> many1 parseDCModDown
+            <|> parseDCModAddBass
+            <?> "modifier"
 
 parseDCModPower :: MyParser [DCMod]
 parseDCModPower = char 'p' >> return [DPower]
+
+parseDCModAddTreb :: MyParser [DCMod]
+parseDCModAddTreb = char 'a' >> parseDCModAddTrebSD
+
+parseDCModAddTrebSD :: MyParser [DCMod]
+parseDCModAddTrebSD = do
+                         char 's'
+                         i <- pInteger
+                         return [(DAdd Treble (round i))]
 
 parseDCModInv :: MyParser DCMod 
 parseDCModInv = char 'i' >> return DInvert
 
 parseDCModInvNum :: MyParser [DCMod]
 parseDCModInvNum = do
-              char 'i'
-              n <- pInteger
-              return $ replicate (round n) DInvert
+                      char 'i'
+                      n <- pInteger
+                      return $ replicate (round n) DInvert
 
 parseDCModOpen :: MyParser DCMod 
 parseDCModOpen = char 'o' >> return DOpen
@@ -859,5 +870,14 @@ parseDCModDownNum = do
               char 'd'
               n <- pInteger
               return $ replicate (round n) DDown
+
+parseDCModAddBass :: MyParser [DCMod]
+parseDCModAddBass = char 'b' >> parseDCModAddBassSD
+
+parseDCModAddBassSD :: MyParser [DCMod]
+parseDCModAddBassSD = do
+                         char 's'
+                         i <- pInteger
+                         return [(DAdd Bass (round i))]
 
 
