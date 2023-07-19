@@ -129,7 +129,6 @@ instance Functor TPat where
   fmap _ (TPat_Var s) = TPat_Var s
   fmap f (TPat_Chord g iP nP msP) = TPat_Chord (f . g) iP nP msP
   -- customized
-  -- TODO: is this an appropriate fmap?
   fmap f (TPat_DChord g degsP modsP) = TPat_DChord (f . g) degsP modsP 
 
 tShowList :: (Show a) => [TPat a] -> String
@@ -833,13 +832,20 @@ parseDCModPower :: MyParser [DCMod]
 parseDCModPower = char 'p' >> return [DPower]
 
 parseDCModAddTreb :: MyParser [DCMod]
-parseDCModAddTreb = char 'a' >> parseDCModAddTrebSD
+parseDCModAddTreb = char 'a' >> (parseDCModAddTSD <|> parseDCModAddTInt)
 
-parseDCModAddTrebSD :: MyParser [DCMod]
-parseDCModAddTrebSD = do
-                         char 'S'
-                         i <- pInteger
-                         return [(DAdd Treble (Just (round i)) 0)]
+parseDCModAddTSD :: MyParser [DCMod]
+parseDCModAddTSD = do
+                      char 'S'
+                      i <- pInteger
+                      return [(DAdd Treble (Just (round i)) 0)]
+
+parseDCModAddTInt :: MyParser [DCMod]
+parseDCModAddTInt = do
+                       intName <- letter
+                       intNum <- pInteger
+                       let st  = semiFromInterval intName (round intNum)
+                       return [(DAdd Treble Nothing st)]
 
 parseDCModInv :: MyParser DCMod 
 parseDCModInv = char 'i' >> return DInvert
@@ -872,12 +878,19 @@ parseDCModDownNum = do
               return $ replicate (round n) DDown
 
 parseDCModAddBass :: MyParser [DCMod]
-parseDCModAddBass = char 'b' >> parseDCModAddBassSD
+parseDCModAddBass = char 'b' >> (parseDCModAddBSD <|> parseDCModAddBInt)
 
-parseDCModAddBassSD :: MyParser [DCMod]
-parseDCModAddBassSD = do
-                         char 'S'
-                         i <- pInteger
-                         return [(DAdd Bass (Just (round i)) 0)]
+parseDCModAddBSD :: MyParser [DCMod]
+parseDCModAddBSD = do
+                      char 'S'
+                      i <- pInteger
+                      return [(DAdd Bass (Just (round i)) 0)]
+
+parseDCModAddBInt :: MyParser [DCMod]
+parseDCModAddBInt = do
+                       intName <- letter
+                       intNum <- pInteger
+                       let st  = semiFromInterval intName (round intNum)
+                       return [(DAdd Bass Nothing st)]
 
 

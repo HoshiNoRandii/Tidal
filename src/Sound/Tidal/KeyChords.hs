@@ -53,15 +53,15 @@ semiAdd d i = Degree {deg = newDeg, semi = newSemi, octs = newOcts}
 
 
 -- degrees can be compared
+-- 12 semitones = 1 octave
 instance Eq Degree where 
    (Degree d1 s1 o1) == (Degree d2 s2 o2) 
-      = (d1 == d2) && (s1 == s2) && (o1 == o2)
+      = (d1 == d2) && (s1 + 12*o1 == s2 + 12*o2)
 
 instance PO.PartialOrd Degree where
    (Degree d1 s1 o1) <= (Degree d2 s2 o2) 
-      =  ((d1 == d2) && (s1 == s2) && (o1 <= o2))
-      || ((d1 == d2) && (s1 <= s2) && (o1 == o2))
-      || ((d1 <= d2) && (s1 == s2) && (o1 == o2))
+      =  (d1 <= d2) && (s1 + 12*o1 == s2 + 12*o2)
+      || (d1 == d2) && (s1 + 12*o1 <= s2 + 12*o2)
 
 -- isTopSorted checks if a list of partially ordered elements
 -- is in a valid topological sorting
@@ -197,14 +197,59 @@ sclDegGetNote k sclDeg = midiPlayable $ Note $ ton + (mode k)!!ind + 12*oct
 -- and if it is not, moves it up or down octaves until it is
 midiPlayable :: Note -> Note
 midiPlayable n
-   | (-72) <= n && n <= 55 = n -- the note is MIDI playable, return it
-   | n < (-72)             = midiPlayable (n + 12) -- the note is too low,
-                                                   -- raise it an octave
-                                                   -- and try again
-   | n > 55                = midiPlayable (n - 12) -- the note is too high,
-                                                   -- lower it an octave
-                                                   -- and try again
+   | n < (-72) = midiPlayable (n + 12) -- the note is too low, raise it an
+                                       -- octave and try again
+   | n > 55    = midiPlayable (n - 12) -- the note is too high, lower it an
+                                       -- octave and try again
+   | otherwise = n -- the note is MIDI playable, return it
 
+-- semiFromInterval takes a Char and an Int representing an interval
+-- (i.e., 'm' and 3 to represent a minor third)
+-- and returns the number of semitones in that interval
+semiFromInterval :: Char -> Int -> Int
+semiFromInterval name num
+   = (semiFromInterMod7 name numClass) + 12*numOcts 
+     where
+        (numOcts, numClass) = divMod num 7
+
+-- semiFromInterMod7 takes a Char and an Int representing an interval
+-- (here, the Int must be between 0 and 6 inclusive)
+-- and returns the number of semitones in that interval
+-- note that 0 represents a 7th, but an octave down
+-- as divMod 7 7 = (1, 0) (see semiFromInterval)
+semiFromInterMod7 :: Char -> Int -> Int
+semiFromInterMod7 'm' nC = case nC of
+                              2 -> 1
+                              3 -> 3
+                              6 -> 8
+                              0 -> 10-12
+                              _ -> error ("unknown interval m" ++ show nC)
+semiFromInterMod7 'M' nC = case nC of
+                              2 -> 2
+                              3 -> 4
+                              6 -> 9
+                              0 -> 11-12
+                              _ -> error ("unknown interval M" ++ show nC)
+semiFromInterMod7 'd' nC = case nC of
+                              3 -> 2
+                              4 -> 4
+                              5 -> 6
+                              6 -> 7
+                              0 -> 9-12
+                              _ -> error ("unknown interval d" ++ show nC)
+semiFromInterMod7 'A' nC = case nC of
+                              2 -> 3
+                              3 -> 5
+                              4 -> 6
+                              5 -> 8
+                              6 -> 10
+                              _ -> error ("unknown interval A" ++ show nC)
+semiFromInterMod7 'P' nC = case nC of
+                              1 -> 0
+                              4 -> 5
+                              5 -> 7
+                              _ -> error ("unknown interval P" ++ show nC)
+semiFromInterMod7  n  nC = error ("unknown interval " ++ [n] ++ show nC)
 
 ------ modifier functions ------
 
@@ -288,27 +333,43 @@ degChordDown chord = DegChord {degRoot = r, degList = dL}
 -- of the given chord
 -- the new note is added to the octave above the root
 degChordAdd :: Maybe Int -> Int -> DegChord -> DegChord
-degChordAdd i st chord = DegChord {degRoot = r, degList = dL}
-                         where
-                            r = degRoot chord
-                            rootDeg = deg r
-                            rootOct = octs r
-                            d = if i == Nothing
-                                   then rootDeg
-                                   else fromJust i
-                            newDeg  
-                               | d <= rootDeg 
-                                  = Degree { deg = d
-                                           , semi = st
-                                           , octs = rootOct + 1 }
-                               | d > rootDeg  
-                                  = Degree { deg = d
-                                           , semi = st
-                                           , octs = rootOct } 
-                            newDL = degList chord ++ [newDeg]
-                            dL = if isTopSorted newDL
-                                    then newDL
-                                    else topSort newDL
+degChordAdd i st chord = if i == Nothing
+                            then degChordAddInt st chord
+                            else degChordAddSD (fromJust i) st chord
+
+degChordAddInt :: Int -> DegChord -> DegChord
+degChordAddInt st chord = DegChord {degRoot = r, degList = dL}
+                          where
+                          r = degRoot chord
+                          rootDeg = deg r
+                          rootOct = octs r
+                          newDeg = Degree { deg = rootDeg
+                                          , semi = st
+                                          , octs = rootOct } 
+                          newDL = degList chord ++ [newDeg]
+                          dL = if isTopSorted newDL
+                                  then newDL
+                                  else topSort newDL
+
+degChordAddSD :: Int -> Int -> DegChord -> DegChord
+degChordAddSD i st chord = DegChord {degRoot = r, degList = dL}
+                           where
+                              r = degRoot chord
+                              rootDeg = deg r
+                              rootOct = octs r
+                              newDeg  
+                                 | i <= rootDeg 
+                                    = Degree { deg = i
+                                             , semi = st
+                                             , octs = rootOct + 1 }
+                                 | otherwise -- (i > rootDeg)  
+                                    = Degree { deg = i
+                                             , semi = st
+                                             , octs = rootOct } 
+                              newDL = degList chord ++ [newDeg]
+                              dL = if isTopSorted newDL
+                                      then newDL
+                                      else topSort newDL
 
 -- degChordAddBass adds a new note to a DegChord by scale degree
 -- and a semitone adjustment
@@ -317,27 +378,44 @@ degChordAdd i st chord = DegChord {degRoot = r, degList = dL}
 -- the new note is added to the octave below the first note in the 
 -- degList, which should be the lowest note
 degChordAddBass :: Maybe Int -> Int -> DegChord -> DegChord
-degChordAddBass i st chord = DegChord {degRoot = r, degList = dL}
-                             where
-                                r = degRoot chord
-                                lowest = (degList chord)!!0
-                                lDeg = deg lowest
-                                lOct = octs lowest
-                                d = if i == Nothing
-                                   then deg r 
-                                   else fromJust i
-                                newDeg
-                                   | d < lDeg
-                                      = Degree { deg = d
-                                               , semi = st
-                                               , octs = lOct }
-                                   | d >= lDeg
-                                      = Degree { deg = d
-                                               , semi = st
-                                               , octs = lOct - 1 }
-                                -- do not need to sort, as this should be the
-                                -- new lowest note
-                                dL = newDeg:(degList chord)
+degChordAddBass i st chord = if i == Nothing
+                                then degChordAddBInt st chord
+                                else degChordAddBSD (fromJust i) st chord
+
+degChordAddBInt :: Int -> DegChord -> DegChord
+degChordAddBInt st chord = DegChord {degRoot = r, degList = dL}
+                           where
+                              r = degRoot chord
+                              rootDeg = deg r
+                              lowest = (degList chord)!!0
+                              lOct = octs lowest
+                              newDeg = Degree { deg = rootDeg
+                                              , semi = st
+                                              , octs = lOct - 1}
+                              -- do not need to sort, as this should be the
+                              -- new lowest note
+                              dL = newDeg:(degList chord)
+
+degChordAddBSD :: Int -> Int -> DegChord -> DegChord
+degChordAddBSD i st chord = DegChord {degRoot = r, degList = dL}
+                            where
+                               r = degRoot chord
+                               lowest = (degList chord)!!0
+                               lDeg = deg lowest
+                               lOct = octs lowest
+                               newDeg
+                                  | i < lDeg
+                                     = Degree { deg = i
+                                              , semi = st
+                                              , octs = lOct }
+                                  | otherwise -- (i >= lDeg)
+                                     = Degree { deg = i
+                                              , semi = st
+                                              , octs = lOct - 1 }
+                               -- do not need to sort, as this should be the
+                               -- new lowest note
+                               dL = newDeg:(degList chord)
+
 
 ------ functions that interface with the parser ------
 
