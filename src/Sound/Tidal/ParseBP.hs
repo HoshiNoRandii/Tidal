@@ -838,7 +838,13 @@ parseDCModAddTSD :: MyParser [DCMod]
 parseDCModAddTSD = do
                       char 'S'
                       i <- pInteger
-                      return [(DAdd Treble (Just (round i)) 0)]
+                      accs <- many accidentals
+                      let st = foldr (+) 0 accs
+                      return [(DAdd Treble (Just (round i)) st)]
+                   where
+                      accidentals :: MyParser Int
+                      accidentals = choice [char 's' >> return 1,
+                                            char 'f' >> return (-1)]
 
 parseDCModAddTInt :: MyParser [DCMod]
 parseDCModAddTInt = do
@@ -884,7 +890,13 @@ parseDCModAddBSD :: MyParser [DCMod]
 parseDCModAddBSD = do
                       char 'S'
                       i <- pInteger
-                      return [(DAdd Bass (Just (round i)) 0)]
+                      accs <- many accidentals
+                      let st = foldr (+) 0 accs
+                      return [(DAdd Bass (Just (round i)) st)]
+                   where
+                      accidentals :: MyParser Int
+                      accidentals = choice [char 's' >> return 1,
+                                            char 'f' >> return (-1)]
 
 parseDCModAddBInt :: MyParser [DCMod]
 parseDCModAddBInt = do
