@@ -66,9 +66,10 @@ instance PO.PartialOrd Degree where
 -- isTopSorted checks if a list of partially ordered elements
 -- is in a valid topological sorting
 isTopSorted :: (PO.PartialOrd a) => [a] -> Bool
-isTopSorted []     = True
-isTopSorted [x]    = True
-isTopSorted (x:xs) = sorted x (xs!!0) && isTopSorted xs
+isTopSorted [] = True
+isTopSorted (x:xs) = if length xs == 0
+                        then True
+                        else sorted x (xs!!0) && isTopSorted xs
                      where
                         sorted a b
                            | a PO.<= b                 = True
@@ -196,12 +197,12 @@ sclDegGetNote k sclDeg = midiPlayable $ Note $ ton + (mode k)!!ind + 12*oct
 -- if the note is within MIDI playable range, returns it
 -- and if it is not, moves it up or down octaves until it is
 midiPlayable :: Note -> Note
-midiPlayable n
-   | n < (-72) = midiPlayable (n + 12) -- the note is too low, raise it an
+midiPlayable i
+   | i < (-72) = midiPlayable (i + 12) -- the note is too low, raise it an
                                        -- octave and try again
-   | n > 55    = midiPlayable (n - 12) -- the note is too high, lower it an
+   | i > 55    = midiPlayable (i - 12) -- the note is too high, lower it an
                                        -- octave and try again
-   | otherwise = n -- the note is MIDI playable, return it
+   | otherwise = i -- the note is MIDI playable, return it
 
 -- semiFromInterval takes a Char and an Int representing an interval
 -- (i.e., 'm' and 3 to represent a minor third)
@@ -218,77 +219,79 @@ semiFromInterval name num
 -- note that 0 represents a 7th, but an octave down
 -- as divMod 7 7 = (1, 0) (see semiFromInterval)
 semiFromInterMod7 :: Char -> Int -> Int
-semiFromInterMod7 'm' nC = case nC of
-                              2 -> 1
-                              3 -> 3
-                              6 -> 8
-                              0 -> 10-12
-                              _ -> error ("unknown interval m" ++ show nC)
-semiFromInterMod7 'M' nC = case nC of
-                              2 -> 2
-                              3 -> 4
-                              6 -> 9
-                              0 -> 11-12
-                              _ -> error ("unknown interval M" ++ show nC)
-semiFromInterMod7 'd' nC = case nC of
-                              3 -> 2
-                              4 -> 4
-                              5 -> 6
-                              6 -> 7
-                              0 -> 9-12
-                              _ -> error ("unknown interval d" ++ show nC)
-semiFromInterMod7 'A' nC = case nC of
-                              2 -> 3
-                              3 -> 5
-                              4 -> 6
-                              5 -> 8
-                              6 -> 10
-                              _ -> error ("unknown interval A" ++ show nC)
-semiFromInterMod7 'P' nC = case nC of
-                              1 -> 0
-                              4 -> 5
-                              5 -> 7
-                              _ -> error ("unknown interval P" ++ show nC)
-semiFromInterMod7  n  nC = error ("unknown interval " ++ [n] ++ show nC)
+semiFromInterMod7 'm'  nC = case nC of
+                               2 -> 1
+                               3 -> 3
+                               6 -> 8
+                               0 -> 10-12
+                               _ -> error ("unknown interval m" ++ show nC)
+semiFromInterMod7 'M'  nC = case nC of
+                               2 -> 2
+                               3 -> 4
+                               6 -> 9
+                               0 -> 11-12
+                               _ -> error ("unknown interval M" ++ show nC)
+semiFromInterMod7 'd'  nC = case nC of
+                               3 -> 2
+                               4 -> 4
+                               5 -> 6
+                               6 -> 7
+                               0 -> 9-12
+                               _ -> error ("unknown interval d" ++ show nC)
+semiFromInterMod7 'A'  nC = case nC of
+                               2 -> 3
+                               3 -> 5
+                               4 -> 6
+                               5 -> 8
+                               6 -> 10
+                               _ -> error ("unknown interval A" ++ show nC)
+semiFromInterMod7 'P'  nC = case nC of
+                               1 -> 0
+                               4 -> 5
+                               5 -> 7
+                               _ -> error ("unknown interval P" ++ show nC)
+semiFromInterMod7 name nC = error ("unknown interval " ++ [name] ++ show nC)
+
 
 ------ modifier functions ------
 
 -- invertDChord takes the first entry in the degList of a DegChord,
 -- raises it an octave, and moves it to the end of the degList
 invertDChord :: DegChord -> DegChord
-invertDChord chord = DegChord {degRoot = r, degList = dL}
-                     where
-                        -- grab the first degree and 
-                        -- put the remaining degrees in a separate list
-                        (first:remaining) = degList chord
-                        firstUp = first `octAdd` 1
-                        dL = remaining ++ [firstUp]
-                        -- the root stays the same unless it was the one that
-                        -- was raised an octave
-                        r = if first == degRoot chord
-                               then firstUp
-                               else degRoot chord
+invertDChord (DegChord r [])                = DegChord r []
+invertDChord (DegChord r (first:remaining)) = DegChord newR dL
+   where
+       -- grab the first degree and 
+       -- put the remaining degrees in a separate list
+       firstUp = first `octAdd` 1
+       dL = remaining ++ [firstUp]
+       -- the root stays the same unless it was the one that
+       -- was raised an octave
+       newR = if first == r 
+                 then firstUp
+                 else r 
 
 -- openDChord takes a DegChord and spreads the entries in the degList
 -- further from each other
 openDChord :: DegChord -> DegChord
-openDChord chord = DegChord {degRoot = r, degList = dL}
-                   where
-                      oldDL = degList chord
-                      len = length oldDL
-                      -- split the list roughly in half with a single
-                      -- element in the center
-                      splitInd = len `quot` 2
-                      (down, stay:up) = splitAt splitInd oldDL
-                      dL = (spreadDown down) ++ [stay] ++ (spreadUp up)
-                      -- grab the deg from the original root
-                      rDeg = deg (degRoot chord)
-                      -- grab all instances of the root deg in dL
-                      roots = filter (\x -> deg x == rDeg) dL
-                      -- grab the lowest to set to the new root
-                      -- (even though Degrees are partially ordered,
-                      -- within the same deg they are totally ordered)
-                      r = (PO.minima roots)!!0
+openDChord (DegChord r [])  = DegChord r []
+openDChord (DegChord r [d]) = DegChord r [d]
+openDChord (DegChord r ds)  = DegChord newR dL
+   where
+      len = length ds 
+      -- split the list roughly in half with a single
+      -- element in the center
+      splitInd = len `quot` 2
+      (down, stay:raise) = splitAt splitInd ds 
+      dL = (spreadDown down) ++ [stay] ++ (spreadUp raise)
+      -- grab the deg from the original root
+      rDeg = deg r 
+      -- grab all instances of the root deg in dL
+      roots = filter (\x -> deg x == rDeg) dL
+      -- grab the lowest to set to the new root
+      -- (even though Degrees are partially ordered,
+      -- within the same deg they are totally ordered)
+      newR = (PO.minima roots)!!0
 
 -- spreadDown takes a List of Degrees and spreads them out
 -- by lowering them by octaves
