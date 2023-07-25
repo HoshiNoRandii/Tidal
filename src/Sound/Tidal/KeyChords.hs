@@ -54,7 +54,7 @@ instance PartialOrd Degree where
       || (d1 > d2) && (s1 <= s2 - 5*(d1 - d2)) -- the largest gap between scale
                                                -- degrees of a scale in the
                                                -- scaleTable is 5 semitones
-      || (d1 <= d2 - (s2-s1)) && (s1 > s2) -- the smallest gap between scale
+      || (d1 <= d2 - (s1-s2)) && (s1 > s2) -- the smallest gap between scale
                                            -- degrees of a scale in the
                                            -- scaleTable is 1 semitone
 -- TODO: make these^ calculate the largest and smallest gap, rather than
