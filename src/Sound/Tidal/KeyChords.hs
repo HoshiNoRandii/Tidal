@@ -11,7 +11,6 @@ module Sound.Tidal.KeyChords where
 
 import           Data.Maybe
 import           Data.List
-import qualified Data.PartialOrd     as PO
 import           Sound.Tidal.Types
 import           Sound.Tidal.Scales
 import           Sound.Tidal.Pattern
@@ -21,69 +20,113 @@ import           Sound.Tidal.Params
 
 -- Degree type
 -- for indicating scale degree when you don't know what scale you are using
--- includes the degree, a semitone adjustment, and  octave adjustment
+-- includes the degree and a semitone adjustment
 data Degree = Degree { deg :: Int
                      , semi :: Int
-                     , octs :: Int
                      } deriving (Show)
 
 -- degAdd function to easily add to the degree field of a Degree
 degAdd :: Degree -> Int -> Degree
-degAdd d i = Degree {deg = newDeg, semi = newSemi, octs = newOcts}
-             where
-                newDeg = deg d + i
-                newSemi = semi d
-                newOcts = octs d
+degAdd (Degree d st) i = Degree (d+i) st
 
--- octAdd function to easily add to the octaves field of a Degree
+-- octAdd function to easily add an octave (12 semitones) to a Degree
 octAdd :: Degree -> Int -> Degree
-octAdd d i = Degree {deg = newDeg, semi = newSemi, octs = newOcts}
-             where
-                newDeg = deg d
-                newSemi = semi d
-                newOcts = octs d + i
+octAdd (Degree d st) i = Degree d (st+12*i)
 
--- semiAdd function to easily add to the octaves field of a Degree
+-- semiAdd function to easily add to the semitone field of a Degree
 semiAdd :: Degree -> Int -> Degree
-semiAdd d i = Degree {deg = newDeg, semi = newSemi, octs = newOcts}
-              where
-                 newDeg = deg d
-                 newSemi = semi d + i
-                 newOcts = octs d 
-
+semiAdd (Degree d st) i = Degree d (st+i)
 
 -- degrees can be compared
--- 12 semitones = 1 octave
 instance Eq Degree where 
-   (Degree d1 s1 o1) == (Degree d2 s2 o2) 
-      = (d1 == d2) && (s1 + 12*o1 == s2 + 12*o2)
+   (Degree d1 s1) == (Degree d2 s2) 
+      = (d1 == d2) && (s1 == s2)
 
-instance PO.PartialOrd Degree where
-   (Degree d1 s1 o1) <= (Degree d2 s2 o2) 
-      =  (d1 <= d2) && (s1 + 12*o1 == s2 + 12*o2)
-      || (d1 == d2) && (s1 + 12*o1 <= s2 + 12*o2)
+-- octEquiv checks if two Degrees are equivalent up to octave
+-- 12 semitones = 1 octave
+octEquiv :: Degree -> Degree -> Bool
+octEquiv (Degree d1 s1) (Degree d2 s2)
+   = (d1 == d2) && ((s1 `mod` 12) == (s2 `mod` 12))
+
+instance PartialOrd Degree where
+   partLE (Degree d1 s1) (Degree d2 s2)
+      =  (d1 <= d2) && (s1 <= s2)
+      || (d1 > d2) && (s1 <= s2 - 5*(d1 - d2)) -- the largest gap between scale
+                                               -- degrees of a scale in the
+                                               -- scaleTable is 5 semitones
+      || (d1 <= d2 - (s2-s1)) && (s1 > s2) -- the smallest gap between scale
+                                           -- degrees of a scale in the
+                                           -- scaleTable is 1 semitone
+-- TODO: make these^ calculate the largest and smallest gap, rather than
+-- hardcoding them
+
+class PartialOrd a where
+   partLE :: a -> a -> Bool
+   partGE :: a -> a -> Bool
+   partLT :: a -> a -> Bool
+   partGT :: a -> a -> Bool
+   partEQ :: a -> a -> Bool
+   partNE :: a -> a -> Bool
+   partCompare :: a -> a -> Maybe Ordering
+
+   partGE x y = partLE y x
+   partLT x y = (partLE x y) && (partNE x y)
+   partGT x y = (partGE x y) && (partNE x y)
+   partEQ x y = (partLE x y) && (partGE x y)
+   partNE x y = not $ partEQ x y
+   partCompare x y
+      | partLT x y = Just LT
+      | partGT x y = Just GT
+      | partEQ x y = Just EQ
+      | otherwise  = Nothing
 
 -- isTopSorted checks if a list of partially ordered elements
 -- is in a valid topological sorting
-isTopSorted :: (PO.PartialOrd a) => [a] -> Bool
+isTopSorted :: (PartialOrd a) => [a] -> Bool
 isTopSorted [] = True
-isTopSorted (x:xs) = if length xs == 0
-                        then True
-                        else sorted x (xs!!0) && isTopSorted xs
-                     where
-                        sorted a b
-                           | a PO.<= b                 = True
-                           | PO.compare a b == Nothing = True
-                           | otherwise                 = False
+isTopSorted (x:xs) 
+   | length xs == 0 = True
+   | otherwise      = sorted x (xs!!0) && isTopSorted xs
+
+-- sorted checks if two elements are in a valid topological sorting
+sorted :: (PartialOrd a) => a -> a -> Bool
+sorted x y
+   | x `partLE` y                 = True
+   | x `partCompare` y == Nothing = True
+   | otherwise                    = False
 
 -- topSort returns a valid topological sorting of a list of
 -- partially ordered elements
-topSort :: (PO.PartialOrd a) => [a] -> [a]
-topSort [] = []
-topSort list = mins ++ (topSort remaining)
-               where
-                  mins = PO.minima list
-                  remaining = filter (flip PO.notElem mins) list
+topSort :: (PartialOrd a) => [a] -> [a]
+topSort list 
+   | isTopSorted list = list
+   | otherwise        = mins ++ (topSort remaining)
+      where
+         mins = minima list
+         remaining = filter (flip partNotElem mins) list
+
+-- minima returns the list of all elements which are not greater than
+-- any other element of the list
+minima :: (PartialOrd a) => [a] -> [a]
+minima list = filter (\x -> all (not . partGT x) list) list
+
+-- partElem checks if an element is a member of the structure
+-- using the partial order notion of equality
+partElem :: (Foldable t, PartialOrd a) => a -> t a -> Bool
+partElem x xs = foldr f False xs
+   where f = foldComp x
+
+-- foldComp is a helper function for partElem
+-- returns True if it is passed True
+-- or if x `partEQ` y
+-- the Bool it is passed represents whether the element has occurred
+-- in the structure yet
+foldComp :: (PartialOrd a) => a -> a -> Bool -> Bool
+foldComp x y bool = bool || (x `partEQ` y)
+
+-- partNotElem is the negation of partElem
+partNotElem :: (Foldable t, PartialOrd a) => a -> t a -> Bool
+partNotElem x xs = not $ partElem x xs
 
 -- DegChord type
 -- a chord of scale degrees
@@ -116,11 +159,10 @@ data Key = Key { tonic :: Note
 -- and a String modeStr with the name of a scale (mode)
 -- and contructs a Key
 strKey :: Note -> String -> Key
-strKey ton modeStr = if jMode /= Nothing -- make sure the scale is findable
-                         then Key {tonic = ton, mode = (fromJust jMode)}
-                         else error "Mode not available"
-                     where jMode = lookup modeStr scaleTable 
-
+strKey ton modeStr 
+   | jMode /= Nothing = Key {tonic = ton, mode = (fromJust jMode)}
+   | otherwise        = error "Mode not available"
+   where jMode = lookup modeStr scaleTable
 
 -- DCMod type
 -- modifiers for DegChords
@@ -181,17 +223,17 @@ degChordToNoteList key chord = sort $ map (sclDegGetNote key) (degList chord)
 -- a MIDI number, and will instead bring them up or down octaves until
 -- they are within MIDI playable range
 sclDegGetNote :: Key -> Degree -> Note
-sclDegGetNote k sclDeg = midiPlayable $ Note $ ton + (mode k)!!ind + 12*oct
-                           where
-                              ton = unNote $ tonic k
-                              len = length $ mode k
-                              d = deg sclDeg
-                              -- (deg - 1) because lists are indexed from 0,
-                              -- but scale degree is traditionally indexed
-                              -- from 1
-                              oct = fromIntegral $ ((d - 1) `div` len)
-                                       + (octs sclDeg) -- octave adjustment
-                              ind = (d - 1) `mod` len -- index in the mode
+sclDegGetNote (Key t mo) (Degree d st) = midiPlayable $ Note 
+                                         $ ton + mo!!ind + 12*oct + sem
+   where
+      ton = unNote t
+      sem = fromIntegral st
+      len = length mo
+      -- (d - 1) because lists are indexed from 0,
+      -- but scale degree is traditionally indexed
+      -- from 1
+      ind = (d - 1) `mod` len -- index in the mode
+      oct = fromIntegral $ ((d - 1) `div` len) -- octave adjustment
 
 -- midiPlayable takes a Note and
 -- if the note is within MIDI playable range, returns it
@@ -258,77 +300,107 @@ semiFromInterMod7 name nC = error ("unknown interval " ++ [name] ++ show nC)
 -- invertDChord takes the first entry in the degList of a DegChord,
 -- raises it an octave, and moves it to the end of the degList
 invertDChord :: DegChord -> DegChord
-invertDChord (DegChord r [])                = DegChord r []
-invertDChord (DegChord r (first:remaining)) = DegChord newR dL
-   where
-       -- grab the first degree and 
-       -- put the remaining degrees in a separate list
-       firstUp = first `octAdd` 1
-       dL = remaining ++ [firstUp]
-       -- the root stays the same unless it was the one that
-       -- was raised an octave
-       newR = if first == r 
-                 then firstUp
-                 else r 
+invertDChord (DegChord r dL) = DegChord (f r) (firstToLast $ fmap f dL)
+   where f = listCompUp dL
+
+-- listCompUp takes a list of Degrees and applies compUp with the first item
+-- in the list as the first Degree passed to compUp
+listCompUp :: [Degree] -> Degree -> Degree
+listCompUp [] = id
+listCompUp (x:xs) = compUp x
+
+-- compUp takes two Degrees. If they are the same, it returns the same
+-- Degree raised an octave.
+-- If they are not the same, it returns the second Degree
+compUp :: Degree -> Degree -> Degree
+compUp x y
+   | x == y    = y `octAdd` 1
+   | otherwise = y
+
+-- firstToLast takes a list and moves the first element of the list to
+-- the end of the list
+firstToLast :: [a] -> [a]
+firstToLast [] = []
+firstToLast (x:xs) = xs ++ [x]
 
 -- openDChord takes a DegChord and spreads the entries in the degList
 -- further from each other
 openDChord :: DegChord -> DegChord
-openDChord (DegChord r [])  = DegChord r []
-openDChord (DegChord r [d]) = DegChord r [d]
-openDChord (DegChord r ds)  = DegChord newR dL
-   where
-      len = length ds 
-      -- split the list roughly in half with a single
-      -- element in the center
-      splitInd = len `quot` 2
-      (down, stay:raise) = splitAt splitInd ds 
-      dL = (spreadDown down) ++ [stay] ++ (spreadUp raise)
-      -- grab the deg from the original root
-      rDeg = deg r 
-      -- grab all instances of the root deg in dL
-      roots = filter (\x -> deg x == rDeg) dL
-      -- grab the lowest to set to the new root
-      -- (even though Degrees are partially ordered,
-      -- within the same deg they are totally ordered)
-      newR = (PO.minima roots)!!0
+openDChord (DegChord r dL) = DegChord (lowestMatch r newDL) newDL
+   where newDL = spreadDegList dL
 
--- spreadDown takes a List of Degrees and spreads them out
--- by lowering them by octaves
--- entries earlier in the list are lowered more
-spreadDown :: [Degree] -> [Degree]
-spreadDown [] = []
-spreadDown degs = (spreadDown (init degs)) ++ [(last degs) `octAdd` (-1)]
+-- lowestMatch finds the lowest Degree in the given list that is the same 
+-- scale degree as the given reference Degree
+lowestMatch :: Degree -> [Degree] -> Degree
+lowestMatch ref dL = (minima $ matches ref dL)!!0 -- Degrees are totally ordered
+                                                  -- within the same deg
 
--- spreadUp takes a List of Degrees and spreads them out
--- by raising them by octaves
--- entries later in the list are raised more
-spreadUp :: [Degree] -> [Degree]
-spreadUp [] = []
-spreadUp degs = [(head degs) `octAdd` 1] ++ (spreadUp (tail degs))
+-- matches finds all Degrees in the given list that are the same scale
+-- degree as the given reference Degree
+matches :: Degree -> [Degree] -> [Degree]
+matches ref dL = filter (octEquiv ref) dL
+
+-- spreadDegList takes a list of Degrees that is assumed to be sorted
+-- and spreads the entries further from each other
+-- by lowering the lowest third of the list by 2 octaves, 
+-- lowering the middle third of the list by 1 octave,
+-- and raising the highest note an octave
+spreadDegList :: [Degree] -> [Degree]
+spreadDegList dL = (map (flip octAdd (-2)) $ parts!!0)
+                   ++ (map (flip octAdd (-1)) $ parts!!1)
+                   ++ (raiseLast $ parts!!2)
+   where parts = dL `splitInN` 3
+
+-- splitInN splits a the given list into N roughly even parts and returns
+-- a list of these parts (which are lists)
+splitInN :: [a] -> Int -> [[a]]
+splitInN [] _ = []
+splitInN xs i = (grabFirstN xs lenFirst):(splitInN (remFirstN xs lenFirst) (i-1))
+   where lenFirst = (length xs) `div` i
+
+-- grabFirstN takes the first N elements of a list and returns them as a list
+grabFirstN :: [a] -> Int -> [a]
+grabFirstN []     _ = []
+grabFirstN _      0 = []
+grabFirstN (x:xs) i = x:(grabFirstN xs (i-1))
+
+-- remFirstN removes the first N elements of a list
+remFirstN :: [a] -> Int -> [a]
+remFirstN []     _ = []
+remFirstN xs     0 = xs
+remFirstN (x:xs) i = remFirstN xs (i-1)
+
+-- raiseLast raises the last Degree in a list by an octave
+raiseLast :: [Degree] -> [Degree]
+raiseLast [] = []
+raiseLast dL = (init dL) ++ [(last dL) `octAdd` 1]
 
 -- powerDChord removes all instances of the scale degree 2 higher than
 -- the root (the "third") from the degList of the given DegChord
 powerDChord :: DegChord -> DegChord
-powerDChord chord = DegChord {degRoot = r, degList = dL}
-                    where
-                       r = degRoot chord
-                       dr = deg r
-                       dL = filter (\x -> deg x /= dr + 2) (degList chord)
+powerDChord (DegChord r dL) 
+   = DegChord r (filter (notThird r) dL)
+
+-- notThird takes a reference Degree deg1 and another Degree deg2
+-- and returns True if deg2 is not 2 scale degrees higher than deg1
+-- (ignoring octaves)
+notThird :: Degree -> Degree -> Bool
+notThird d1 d2 = not $ isThird d1 d2
+
+-- isThird takes a reference Degree deg1 and another Degree deg2
+-- and returns True if deg2 is 2 scale degrees higher than deg1
+-- (ignoring octaves)
+isThird :: Degree -> Degree -> Bool
+isThird (Degree d1 s1) deg2
+   = (Degree (d1+2) s1) `octEquiv` deg2
 
 -- degChordUp raises all notes in a DegChord by an octave
 degChordUp :: DegChord -> DegChord
-degChordUp chord = DegChord {degRoot = r, degList = dL}
-                   where
-                      r = degRoot chord
-                      dL = map (flip octAdd 1) (degList chord)
+degChordUp (DegChord r dL) = DegChord r (map (flip octAdd 1) dL)
 
 -- degChordDown lowers all notes in a DegChord by an octave
 degChordDown :: DegChord -> DegChord
-degChordDown chord = DegChord {degRoot = r, degList = dL}
-                     where
-                        r = degRoot chord
-                        dL = map (flip octAdd (-1)) (degList chord)
+degChordDown (DegChord r dL) = DegChord r (map (flip octAdd (-1)) dL)
 
 -- degChordAdd adds a new note to a DegChord by scale degree
 -- and a semitone adjustment
@@ -336,43 +408,23 @@ degChordDown chord = DegChord {degRoot = r, degList = dL}
 -- of the given chord
 -- the new note is added to the octave above the root
 degChordAdd :: Maybe Int -> Int -> DegChord -> DegChord
-degChordAdd i st chord = if i == Nothing
-                            then degChordAddInt st chord
-                            else degChordAddSD (fromJust i) st chord
+degChordAdd i st (DegChord r dL) 
+   | i == Nothing = DegChord r (degListAddInt st r dL)
+   | otherwise    = DegChord r (degListAddSD (fromJust i) st r dL)
 
-degChordAddInt :: Int -> DegChord -> DegChord
-degChordAddInt st chord = DegChord {degRoot = r, degList = dL}
-                          where
-                          r = degRoot chord
-                          rootDeg = deg r
-                          rootOct = octs r
-                          newDeg = Degree { deg = rootDeg
-                                          , semi = st
-                                          , octs = rootOct } 
-                          newDL = degList chord ++ [newDeg]
-                          dL = if isTopSorted newDL
-                                  then newDL
-                                  else topSort newDL
+-- degListAddInt takes an Int representing number of semitones above the
+-- given Degree to add to the given list of Degrees
+degListAddInt :: Int -> Degree -> [Degree] -> [Degree]
+degListAddInt st (Degree d1 s1) dL
+   = topSort $ dL ++ [(Degree d1 (s1+st))]
 
-degChordAddSD :: Int -> Int -> DegChord -> DegChord
-degChordAddSD i st chord = DegChord {degRoot = r, degList = dL}
-                           where
-                              r = degRoot chord
-                              rootDeg = deg r
-                              rootOct = octs r
-                              newDeg  
-                                 | i <= rootDeg 
-                                    = Degree { deg = i
-                                             , semi = st
-                                             , octs = rootOct + 1 }
-                                 | otherwise -- (i > rootDeg)  
-                                    = Degree { deg = i
-                                             , semi = st
-                                             , octs = rootOct } 
-                              newDL = degList chord ++ [newDeg]
-                              dL = if isTopSorted newDL
-                                      then newDL
-                                      else topSort newDL
+-- degListAddSD takes two Ints representing a scale degree and
+-- a semitone adjustment to add to the given list of Degrees
+-- the new Degree will be added above the given reference Degree
+-- (expect that the reference Degree is the root of a DegChord)
+degListAddSD :: Int -> Int -> Degree -> [Degree] -> [Degree]
+degListAddSD i st refDeg dL
+   = topSort $ dL ++ [(Degree i st) `makeGT` refDeg] 
 
 -- degChordAddBass adds a new note to a DegChord by scale degree
 -- and a semitone adjustment
@@ -381,43 +433,36 @@ degChordAddSD i st chord = DegChord {degRoot = r, degList = dL}
 -- the new note is added to the octave below the first note in the 
 -- degList, which should be the lowest note
 degChordAddBass :: Maybe Int -> Int -> DegChord -> DegChord
-degChordAddBass i st chord = if i == Nothing
-                                then degChordAddBInt st chord
-                                else degChordAddBSD (fromJust i) st chord
+degChordAddBass i st (DegChord r dL)
+   | i == Nothing = DegChord r (degListAddBInt st r dL)
+   | otherwise    = DegChord r (degListAddBSD (fromJust i) st dL)
 
-degChordAddBInt :: Int -> DegChord -> DegChord
-degChordAddBInt st chord = DegChord {degRoot = r, degList = dL}
-                           where
-                              r = degRoot chord
-                              rootDeg = deg r
-                              lowest = (degList chord)!!0
-                              lOct = octs lowest
-                              newDeg = Degree { deg = rootDeg
-                                              , semi = st
-                                              , octs = lOct - 1}
-                              -- do not need to sort, as this should be the
-                              -- new lowest note
-                              dL = newDeg:(degList chord)
+-- degListAddBInt takes an Int representing number of semitones above the
+-- given Degree to add to the bass of the given list of Degrees
+degListAddBInt :: Int -> Degree -> [Degree] -> [Degree]
+degListAddBInt st (Degree d1 s1) dL
+   = [(Degree d1 (s1+st)) `makeLT` (dL!!0)] ++ dL
 
-degChordAddBSD :: Int -> Int -> DegChord -> DegChord
-degChordAddBSD i st chord = DegChord {degRoot = r, degList = dL}
-                            where
-                               r = degRoot chord
-                               lowest = (degList chord)!!0
-                               lDeg = deg lowest
-                               lOct = octs lowest
-                               newDeg
-                                  | i < lDeg
-                                     = Degree { deg = i
-                                              , semi = st
-                                              , octs = lOct }
-                                  | otherwise -- (i >= lDeg)
-                                     = Degree { deg = i
-                                              , semi = st
-                                              , octs = lOct - 1 }
-                               -- do not need to sort, as this should be the
-                               -- new lowest note
-                               dL = newDeg:(degList chord)
+-- degListAddBSD takes two Ints representing a scale degree
+-- and a semitone adjustment to add to the bottom of the given
+-- list of Degrees
+degListAddBSD :: Int -> Int -> [Degree] -> [Degree]
+degListAddBSD i st dL
+   = [(Degree i st) `makeLT` (dL!!0)] ++ dL
+      
+-- makeGT takes two Degrees deg1 and deg2 and moves deg1 by octaves
+-- until deg1 `partGT` deg2 is True
+makeGT :: Degree -> Degree -> Degree
+makeGT deg1 deg2
+   | deg1 `partGT` deg2 = deg1
+   | otherwise          = makeGT (deg1 `octAdd` 1) deg2
+
+-- makeLT takes two Degrees deg1 and deg2 and moves deg1 by octaves
+-- until deg1 `partLT` deg2 is True
+makeLT :: Degree -> Degree -> Degree
+makeLT deg1 deg2
+   | deg1 `partLT` deg2 = deg1
+   | otherwise          = makeLT (deg1 `octAdd` (-1)) deg2
 
 
 ------ functions that interface with the parser ------
@@ -433,7 +478,7 @@ degChordToPatSeq f degP modsP = do
 
 -- patNumToDeg converts a Pattern of Ints to a Pattern of Degrees
 patNumToDeg :: (Pattern t) => t Int -> t Degree
-patNumToDeg pat = fmap (\x -> Degree {deg = x, semi = 0, octs = 0}) pat
+patNumToDeg pat = fmap (\x -> Degree {deg = x, semi = 0} ) pat
 
 -- applyDCModPatSeq applies a List of Patterns of Lists of DCMods
 -- to a Pattern of DegChords
