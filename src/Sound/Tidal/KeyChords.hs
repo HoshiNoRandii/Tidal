@@ -336,7 +336,7 @@ invertDChord (DegChord r dL) = DegChord (f r) (firstToLast $ fmap f dL)
 -- in the list as the first Degree passed to compUp
 listCompUp :: [Degree] -> Degree -> Degree
 listCompUp [] = id
-listCompUp (x:xs) = compUp x
+listCompUp (x:_) = compUp x
 
 -- compUp takes two Degrees. If they are the same, it returns the same
 -- Degree raised an octave.
@@ -397,7 +397,7 @@ grabFirstN (x:xs) i = x:(grabFirstN xs (i-1))
 remFirstN :: [a] -> Int -> [a]
 remFirstN []     _ = []
 remFirstN xs     0 = xs
-remFirstN (x:xs) i = remFirstN xs (i-1)
+remFirstN (_:xs) i = remFirstN xs (i-1)
 
 -- raiseLast raises the last Degree in a list by an octave
 raiseLast :: [Degree] -> [Degree]
