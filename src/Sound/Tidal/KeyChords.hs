@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 
-module Sound.Tidal.KeyChords where
+module Sound.Tidal.KeyChords ( DegChord(..), DCMod(..), AddWhere(..), 
+   keyChords, degChordToPatSeq, semiFromInterval) where
 
 {-
    This is HoshiNoRandii's module to implement chords in TidalCycles in
@@ -9,13 +10,13 @@ module Sound.Tidal.KeyChords where
    a lot of music theory.
 -}
 
-import           Data.Maybe
-import           Data.List
-import           Control.Applicative
-import           Sound.Tidal.Types
-import           Sound.Tidal.Scales
-import           Sound.Tidal.Pattern
-import           Sound.Tidal.Params
+import Control.Applicative ( Applicative(liftA2) )
+import Data.List           ( sort )
+import Data.Maybe          ( fromJust )
+import Sound.Tidal.Params  ( note )
+import Sound.Tidal.Pattern ( Pattern(uncollect) )
+import Sound.Tidal.Scales  ( scaleTable )
+import Sound.Tidal.Types   ( Note(..), ValueMap )
 
 ------ types, classes, and related functions ------
 
@@ -420,8 +421,8 @@ notThird d1 d2 = not $ isThird d1 d2
 -- and returns True if deg2 is 2 scale degrees higher than deg1
 -- (ignoring octaves)
 isThird :: Degree -> Degree -> Bool
-isThird (Degree d1 s1) deg2
-   = (Degree (d1+2) s1) `octEquiv` deg2
+isThird deg1 deg2
+   = (deg1 `degAdd` 2) `octEquiv` deg2
 
 -- degChordUp raises all notes in a DegChord by an octave
 degChordUp :: DegChord -> DegChord
@@ -444,8 +445,8 @@ degChordAdd i st (DegChord r dL)
 -- degListAddInt takes an Int representing number of semitones above the
 -- given Degree to add to the given list of Degrees
 degListAddInt :: Int -> Degree -> [Degree] -> [Degree]
-degListAddInt st (Degree d1 s1) dL
-   = topSort $ dL ++ [(Degree d1 (s1+st))]
+degListAddInt st d dL
+   = topSort $ dL ++ [(d `semiAdd` st)]
 
 -- degListAddSD takes two Ints representing a scale degree and
 -- a semitone adjustment to add to the given list of Degrees
@@ -469,8 +470,8 @@ degChordAddBass i st (DegChord r dL)
 -- degListAddBInt takes an Int representing number of semitones above the
 -- given Degree to add to the bass of the given list of Degrees
 degListAddBInt :: Int -> Degree -> [Degree] -> [Degree]
-degListAddBInt st (Degree d1 s1) dL
-   = [(Degree d1 (s1+st)) `makeLT` (dL!!0)] ++ dL
+degListAddBInt st d dL
+   = [(d `semiAdd` st) `makeLT` (dL!!0)] ++ dL
 
 -- degListAddBSD takes two Ints representing a scale degree
 -- and a semitone adjustment to add to the bottom of the given

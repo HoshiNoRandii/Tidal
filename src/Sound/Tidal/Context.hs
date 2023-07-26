@@ -44,6 +44,4 @@ import           Sound.Tidal.Stream          as C
 -- import Sound.Tidal.Transition as C
 import           Sound.Tidal.Types           as C
 import           Sound.Tidal.Version         as C
-
--- customized
 import           Sound.Tidal.KeyChords       as C
