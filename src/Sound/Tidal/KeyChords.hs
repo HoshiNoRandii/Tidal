@@ -11,7 +11,7 @@ module Sound.Tidal.KeyChords where
 
 import           Data.Maybe
 import           Data.List
-import           Data.Tuple
+import           Control.Applicative
 import           Sound.Tidal.Types
 import           Sound.Tidal.Scales
 import           Sound.Tidal.Pattern
@@ -229,7 +229,7 @@ keyChords tonP modeP chordP = note $ patKeyDCToNotes keyP chordP
 -- and a Pattern of Strings indicating modes
 -- and returns a Pattern of Keys
 patKey :: (Pattern t) => t Note -> t String -> t Key
-patKey tonP modeP = (strKey <$> tonP) <*> modeP
+patKey = liftA2 strKey
 
 -- patKeyDCToNotes takes a Pattern of Keys to pass to
 -- patDegChordToNotes
