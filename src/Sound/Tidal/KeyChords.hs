@@ -180,7 +180,7 @@ degTriad sclDeg = DegChord { degRoot = sclDeg
 -- Key type
 -- includes the tonic and the "scale" (mode)
 data Key = Key { tonic :: Note
-               , mode :: [Double] -- TODO: figure out how to have "Fractional a => [a]" here, to match Scales.hs
+               , mode :: [Double]
                } deriving (Show)
 
 -- another constructor for Keys
