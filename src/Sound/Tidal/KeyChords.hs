@@ -81,12 +81,12 @@ minGap list = minimum $ gaps list
 
 -- scaleMaxGap calculates the largest semitone gap between scale degrees
 -- that can be found in the scaleTable
-scaleMaxGap :: (Fractional a, Ord a) => a
+scaleMaxGap :: Double
 scaleMaxGap = maximum $ map (maxGap . snd) scaleTable
 
 -- scaleMinGap calculates the smallest semitone gap between scale degrees
 -- that can be found thin the scaleTable
-scaleMinGap :: (Fractional a, Ord a) => a
+scaleMinGap :: Double
 scaleMinGap = minimum $ map (minGap . snd) scaleTable
 
 class PartialOrd a where
