@@ -11,6 +11,7 @@ module Sound.Tidal.KeyChords where
 
 import           Data.Maybe
 import           Data.List
+import           Data.Tuple
 import           Sound.Tidal.Types
 import           Sound.Tidal.Scales
 import           Sound.Tidal.Pattern
@@ -49,16 +50,44 @@ octEquiv (Degree d1 s1) (Degree d2 s2)
    = (d1 == d2) && ((s1 `mod` 12) == (s2 `mod` 12))
 
 instance PartialOrd Degree where
-   partLE (Degree d1 s1) (Degree d2 s2)
+   partLE (Degree d1' s1') (Degree d2' s2')
       =  (d1 <= d2) && (s1 <= s2)
-      || (d1 > d2) && (s1 <= s2 - 5*(d1 - d2)) -- the largest gap between scale
-                                               -- degrees of a scale in the
-                                               -- scaleTable is 5 semitones
-      || (d1 <= d2 - (s1-s2)) && (s1 > s2) -- the smallest gap between scale
-                                           -- degrees of a scale in the
-                                           -- scaleTable is 1 semitone
--- TODO: make these^ calculate the largest and smallest gap, rather than
--- hardcoding them
+      || (d1 > d2) && (s1 <= s2 - scaleMaxGap*(d1 - d2)) 
+      || (d1 <= d2 - (s1-s2)/scaleMinGap) && (s1 > s2)
+         where d1 = fromIntegral d1'
+               s1 = fromIntegral s1'
+               d2 = fromIntegral d2'
+               s2 = fromIntegral s2'
+
+-- gaps returns a list of differences between adjacent elements in 
+-- the given list
+-- takes the absolute value of the differences
+gaps :: (Num a) => [a] -> [a]
+gaps [] = []
+gaps (x:xs)
+   | length xs < 1 = []
+   | otherwise     = difference:(gaps xs)
+      where difference = abs $ (xs!!0) - x
+
+-- maxGap returns the largest difference between adjacent elements in
+-- the given list
+maxGap :: (Num a, Ord a) => [a] -> a
+maxGap list = maximum $ gaps list
+
+-- minGap returns the smallest difference between adjacent elements
+-- in the given list
+minGap :: (Num a, Ord a) => [a] -> a
+minGap list = minimum $ gaps list
+
+-- scaleMaxGap calculates the largest semitone gap between scale degrees
+-- that can be found in the scaleTable
+scaleMaxGap :: (Fractional a, Ord a) => a
+scaleMaxGap = maximum $ map (maxGap . snd) scaleTable
+
+-- scaleMinGap calculates the smallest semitone gap between scale degrees
+-- that can be found thin the scaleTable
+scaleMinGap :: (Fractional a, Ord a) => a
+scaleMinGap = minimum $ map (minGap . snd) scaleTable
 
 class PartialOrd a where
    partLE :: a -> a -> Bool
