@@ -47,8 +47,9 @@ Be sure to separate each modifier by a hyphen. `1-am7-i2-d` will parse, but
 
 ### Invert
 
-Inverting a chord takes the lowest note and raises it an octave.
 Use `-i` to invert a chord.
+
+Inverting a chord takes the lowest note and raises it an octave.
 You can invert multiple times, either by typing `i` multiple times or by
 appending the number of inversions you would like.
 For instance, to get the second inversion of the chord built on the 3rd scale
@@ -57,18 +58,21 @@ degree, you could type `3-ii` or `3-i2`.
 ### Open
 
 Use `-o` to open a chord.
+
 You can use multiple `o`s to spread the chord further, i.e. `5-ooo`.
 
 ### Power
 
 Use `-p` to remove all instances of the "third" from the chord, 
 creating a power chord.
+
 In this case, the "third" is the note two scale degrees above the root of the
 chord.
 
 ### Up and Down
 
 Use `-u` or `-d` to move a chord up or down an octave, respectively.
+
 Similar to inversions, this modification can be repeated by duplicating the
 letter or by adding a number to the end.
 So `1-uu` would build a chord on the 1st scale degree and raise it two octaves.
@@ -79,10 +83,12 @@ octaves.
 
 Other notes can be added to chords for flavor.
 Use `-a` to add a note above the root, and use `-b` to add a note to the bass.
+
 Notes can be added by scale degree or by interval above the root.
 Use `S` to indicate that you are adding by scale degree.
 So for example, `1-bS2` would build a chord on the 1st scale degree and then add
 the 2nd scale degree to the bass.
+
 Use interval notations to add by interval above the root.
 For example, `5-am7` would build a chord on the 5th scale degree and then add
 the note that is a minor 7th above the 5th scale degree (creating a dominant
