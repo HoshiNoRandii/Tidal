@@ -89,7 +89,7 @@ data TPat a where
    -- TPat_DChord (func) (scale degrees) ([modifiers])
    -- note that scale degrees here are represented by Ints, not Degrees
    -- and typically a is DegChord, with (func) = id
-   TPat_DChord :: (DegChord -> a) -> TPat Int -> [TPat [DCMod]] -> TPat a
+   -- TPat_DChord :: (DegChord -> a) -> TPat Int -> [TPat [DCMod]] -> TPat a
 
 instance Show a => Show (TPat a) where
   show (TPat_Atom c v) = "TPat_Atom (" ++ show c ++ ") (" ++ show v ++ ")"
@@ -107,7 +107,7 @@ instance Show a => Show (TPat a) where
   show (TPat_EnumFromTo a b) = "TPat_EnumFromTo (" ++ show a ++ ") (" ++ show b ++ ")"
   show (TPat_Var s) = "TPat_Var " ++ show s
   show (TPat_Chord g iP nP msP) = "TPat_Chord (" ++ show (fmap g iP) ++ ") (" ++ show nP ++ ") (" ++ show msP ++ ")"
-  show (TPat_DChord f degsP modsP) = "TPat_DChord (" ++ show f ++ ") (" ++ show degsP ++ ") (" ++ show modsP ++ ")"
+  -- show (TPat_DChord f degsP modsP) = "TPat_DChord (" ++ show f ++ ") (" ++ show degsP ++ ") (" ++ show modsP ++ ")"
 
 instance Functor TPat where
   fmap f (TPat_Atom c v) = TPat_Atom c (f v)
@@ -125,7 +125,7 @@ instance Functor TPat where
   fmap f (TPat_EnumFromTo a b) = TPat_EnumFromTo (fmap f a) (fmap f b)
   fmap _ (TPat_Var s) = TPat_Var s
   fmap f (TPat_Chord g iP nP msP) = TPat_Chord (f . g) iP nP msP
-  fmap f (TPat_DChord g degsP modsP) = TPat_DChord (f . g) degsP modsP 
+  -- fmap f (TPat_DChord g degsP modsP) = TPat_DChord (f . g) degsP modsP
 
 tShowList :: (Show a) => [TPat a] -> String
 tShowList vs = "[" ++ intercalate "," (map tShow vs) ++ "]"
@@ -156,7 +156,7 @@ tShow TPat_Silence = "silence"
 tShow (TPat_EnumFromTo a b) = "mixJoin $ fromTo <$> (" ++ tShow a ++ ") <*> (" ++ tShow b ++ ")"
 tShow (TPat_Var s) = "getControl " ++ s
 tShow (TPat_Chord f n name mods) = "chord (" ++ tShow (fmap f n) ++ ") (" ++ tShow name ++ ")" ++ tShowList mods
-tShow (TPat_DChord f degsP modsP) = "degchord (" ++ show f ++ ") (" ++ tShow degsP ++ ") (" ++ tShowList modsP ++ ")"
+-- tShow (TPat_DChord f degsP modsP) = "degchord (" ++ show f ++ ") (" ++ tShow degsP ++ ") (" ++ tShowList modsP ++ ")"
 tShow a = "can't happen? " ++ show a
 
 
@@ -184,7 +184,7 @@ toPat = \case
    TPat_Var s -> getControl s
    TPat_Chord f iP nP mP -> chordToPatSeq f (toPat iP) (toPat nP) (map toPat mP)
    p@(TPat_Repeat _ _) -> toPat $ TPat_Seq [p] --this is a bit of a hack
-   TPat_DChord f degsP modsP -> degChordToPatSeq f (toPat degsP) (map toPat modsP)
+   -- TPat_DChord f degsP modsP -> degChordToPatSeq f (toPat degsP) (map toPat modsP)
    _ -> silence
    
 toSeq :: (Parseable a, Enumerable a) => TPat a -> Sequence a
@@ -775,6 +775,7 @@ pChord i = do
     ms <- option [] $ many1 (char '\'' >> pTPat)
     return $ TPat_Chord id i n ms
 
+{-
 -- parsing DegChords
 
 instance Parseable DegChord where
@@ -896,4 +897,4 @@ parseDCModAddBInt = do
                        let st  = semiFromInterval intName (round intNum)
                        return [(DAdd Bass Nothing st)]
 
-
+-}
