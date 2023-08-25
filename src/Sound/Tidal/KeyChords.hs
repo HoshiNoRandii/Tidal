@@ -112,6 +112,16 @@ midiPlayable i
                                        -- octave and try again
    | otherwise = i -- the note is MIDI playable, return it
 
+-- isMidiPlayable checks if a Note is within MIDI playable range
+isMidiPlayable :: Note -> Bool
+isMidiPlayable i = (i >= (-72)) && (i <= 55)
+
+-- listIsMidiPlayable checks if a list of Notes are all within
+-- MIDI playable range
+listIsMidiPlayable :: [Note] -> Bool
+listIsMidiPlayable ns = foldr f True ns
+  where f n b = (isMidiPlayable n) && b
+
 -- applyRMods takes a list of Notes and a list of RCMods
 -- and applies the RMods to the list of Notes in the order
 -- they are listed
@@ -146,3 +156,30 @@ openChord [] = []
 openChord [n] = [n]
 openChord (n:ns) = sort $
   (midiPlayable (n-12)):(head ns):(openChord (tail ns))
+
+-- powerChord removes all but the first and last entries in a list
+-- of Notes.
+-- When this is the first modifier applied to a triad built from a
+-- 7 note scale, it produces a power chord (hence the name)
+powerChord :: [Note] -> [Note]
+powerChord [] = []
+powerChord [n] = [n]
+powerChord ns = (head ns):(last ns):[]
+
+-- chordUp raises all Notes in a list by an octave
+-- if any notes would have been raised out of midiPlayable range,
+-- the original chord is returned
+chordUp :: [Note] -> [Note]
+chordUp ns
+  | listIsMidiPlayable nsUp = nsUp
+  | otherwise               = ns
+  where nsUp = map (+12) ns
+
+-- chordDown lowers all Notes in a list by an octave
+-- if any notes would have been lowered out of midiPlayable range,
+-- the original chord is returned
+chordDown :: [Note] -> [Note]
+chordDown ns
+  | listIsMidiPlayable nsDown = nsDown
+  | otherwise                 = ns
+  where nsDown = map (+(-12)) ns
