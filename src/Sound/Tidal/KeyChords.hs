@@ -68,10 +68,10 @@ strKey ton modeStr
 ------ main functions ------
 
 -- rChordToNotes takes an RChord and a Key and returns
--- a list of notes corresponding to the triad built
+-- a list of Notes corresponding to the triad built
 -- on the scale degree indicated in the RChord in the
--- given Key, with the modifications indicated in the
--- RChord
+-- given Key, with the modifications indicated in the RChord.
+-- The Note list should be sorted in ascending order
 rChordToNotes :: RChord -> Key -> [Note]
 rChordToNotes (RChord sd ms) key =
   (flip applyRMods) ms $ sclDegKeyTriad sd key
@@ -124,3 +124,25 @@ applyRMods ns (x:xs) = applyRMods (applyRMod ns x) xs
 -- and applies the RMod to the list of Notes
 applyRMod :: [Note] -> RCMod -> [Note]
 applyRMod ns rm = ns
+
+
+------ modifier functions ------
+
+-- invertChord takes the first Note in a list, raises it an octave,
+-- and moves it to the end of the list
+-- If this operation would take a Note out of MIDI playable range,
+-- invertChord does nothing and returns the original list
+invertChord :: [Note] -> [Note]
+invertChord [] = []
+invertChord (n:ns)
+  | midiPlayable (n+12) == n = n:ns
+  | otherwise                = ns ++ [n+12]
+
+-- openChord takes a list of Notes and spreads them out by
+-- lowering every other Note (except the last Note) by an octave
+-- Notes will not lower out of MIDI playable range
+openChord :: [Note] -> [Note]
+openChord [] = []
+openChord [n] = [n]
+openChord (n:ns) = sort $
+  (midiPlayable (n-12)):(head ns):(openChord (tail ns))
