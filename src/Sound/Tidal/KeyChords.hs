@@ -175,20 +175,38 @@ powerChord [] = []
 powerChord [n] = [n]
 powerChord ns = (head ns):(last ns):[]
 
--- chordUp raises all Notes in a list by an octave
--- if any notes would have been raised out of midiPlayable range,
--- the original chord is returned
-chordUp :: [Note] -> [Note]
-chordUp ns
+-- noteChordUp raises the given NoteChord by an octave
+-- if any Notes would have been raised out of midi playable range,
+-- the original NoteChord is returned
+noteChordUp :: NoteChord -> NoteChord
+noteChordUp (NoteChord nL r key)
+  | newNL == nL = NoteChord nL r key
+  | otherwise   = NoteChord newNL (r+12) key
+  where newNL = noteListUp nL
+
+-- noteListUp raises all Notes in a list by an octave
+-- if any Notes would have been raised out of midi playable range,
+-- the original list is returned
+noteListUp :: [Note] -> [Note]
+noteListUp ns
   | listIsMidiPlayable nsUp = nsUp
   | otherwise               = ns
   where nsUp = map (+12) ns
 
--- chordDown lowers all Notes in a list by an octave
--- if any notes would have been lowered out of midiPlayable range,
--- the original chord is returned
-chordDown :: [Note] -> [Note]
-chordDown ns
+-- noteChordDown lowers the given NoteChord by an octave
+-- if any Notes would have been lowered out of midi playable range,
+-- the original NoteChord is returned
+noteChordDown :: NoteChord -> NoteChord
+noteChordDown (NoteChord nL r key)
+  | newNL == nL = NoteChord nL r key
+  | otherwise   = NoteChord newNL (r-12) key
+  where newNL = noteListDown nL
+
+-- noteListDown lowers all Notes in a list by an octave
+-- if any Notes would have been lowered out of midi playable range,
+-- the original list is returned
+noteListDown :: [Note] -> [Note]
+noteListDown ns
   | listIsMidiPlayable nsDown = nsDown
   | otherwise                 = ns
   where nsDown = map (+(-12)) ns
