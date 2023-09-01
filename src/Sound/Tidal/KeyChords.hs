@@ -192,3 +192,47 @@ chordDown ns
   | listIsMidiPlayable nsDown = nsDown
   | otherwise                 = ns
   where nsDown = map (+(-12)) ns
+
+-- noteChordAdd adds a new note to a NoteChord by scale degree
+-- and a semitone adjustment
+-- if the given scale degree is Nothing, it defaults to the root
+-- of the given chord
+-- the new note is added above the root unless this leaves
+-- midi playable range
+noteChordAdd :: Maybe Int -> Int -> NoteChord -> NoteChord
+noteChordAdd d st nC
+  | d == Nothing = noteChordAddInt st nC
+  | otherwise    = noteChordAddSD (fromJust d) st nC
+
+-- noteListAddInt takes an Int representing number of semitones
+-- above the root to add a Note to the given NoteChord
+-- if the version of the Note above the root is no longer
+-- midi playable, the Note is lowered by octaves until it is
+noteChordAddInt :: Int -> NoteChord -> NoteChord
+noteChordAddInt st (NoteChord nL r key)
+  = NoteChord (noteListAddNote toAdd nL) r key
+    where toAdd = midiPlayable $ r+s
+          s = fromIntegral st
+
+-- noteChordAddSD takes two Ints representing a scale degree and
+-- a semitone adjustment to add to the given NoteChord
+-- the new note is added above the root unless this leaves
+-- midi playable range
+noteChordAddSD :: Int -> Int -> NoteChord -> NoteChord
+noteChordAddSD d st (NoteChord nL r key)
+  = NoteChord (noteListAddNote toAdd nL) r key
+    where toAdd = ((sclDegGetNote d key)+s) `noteHigherThan` r
+          s = fromIntegral st
+
+-- noteListAddNote takes a Note to add to a list of Notes
+-- the list will remain sorted
+noteListAddNote :: Note -> [Note] -> [Note]
+noteListAddNote n nL = sort $ n:nL
+
+-- noteHigherThan takes a Note n and a reference Note r
+-- and makes sure n is higher than r, moving it by octaves,
+-- unless that causes n to leave midi playable range
+noteHigherThan :: Note -> Note -> Note
+noteHigherThan n r
+  | n > r     = midiPlayable n
+  | otherwise = noteHigherThan (n+12) r
