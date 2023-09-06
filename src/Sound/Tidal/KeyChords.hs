@@ -191,18 +191,17 @@ applyNCMod nc m = nc
 -- invertNoteChord takes the bottom Note in a NoteChord
 -- and raises it an octave.
 -- The root of the NoteChord will be updated if it is raised
--- an octave
 invertNoteChord :: NoteChord -> NoteChord
 invertNoteChord (NoteChord nL r key)
   = NoteChord (sort $ fmap f nL) (f r) key
-  where f = listCompUp nL
+  where f = listFirstCompUp nL
 
--- listCompUp takes a list of numbers and applies compUp with
--- the first item in the list as the first number passed
+-- listFirstCompUp takes a list of numbers and applies compUp
+-- with the first item in the list as the first number passed
 -- to compUp
-listCompUp :: (Num a, Eq a) => [a] -> a -> a
-listCompUp [] = id
-listCompUp (x:_) = compUp x
+listFirstCompUp :: (Num a, Eq a) => [a] -> a -> a
+listFirstCompUp [] = id
+listFirstCompUp (x:_) = compUp x
 
 -- compUp takes two numbers. If they are the same, it returns
 -- that number +12.
