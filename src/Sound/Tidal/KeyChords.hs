@@ -221,9 +221,7 @@ powerChord ns = (head ns):(last ns):[]
 -- the original NoteChord is returned
 noteChordUp :: NoteChord -> NoteChord
 noteChordUp (NoteChord nL r key)
-  | newNL == nL = NoteChord nL r key
-  | otherwise   = NoteChord newNL (r+12) key
-  where newNL = noteListUp nL
+  = NoteChord (noteListUp nL) (r+12) key
 
 -- noteListUp raises all Notes in a list by an octave
 -- if any Notes would have been raised out of midi playable range,
@@ -236,9 +234,7 @@ noteListUp ns = map (+12) ns
 -- the original NoteChord is returned
 noteChordDown :: NoteChord -> NoteChord
 noteChordDown (NoteChord nL r key)
-  | newNL == nL = NoteChord nL r key
-  | otherwise   = NoteChord newNL (r-12) key
-  where newNL = noteListDown nL
+  = NoteChord (noteListDown nL) (r-12) key
 
 -- noteListDown lowers all Notes in a list by an octave
 -- if any Notes would have been lowered out of midi playable range,
