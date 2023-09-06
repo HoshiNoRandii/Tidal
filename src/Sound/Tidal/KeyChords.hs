@@ -217,28 +217,20 @@ powerChord [n] = [n]
 powerChord ns = (head ns):(last ns):[]
 
 -- noteChordUp raises the given NoteChord by an octave
--- if any Notes would have been raised out of midi playable range,
--- the original NoteChord is returned
 noteChordUp :: NoteChord -> NoteChord
 noteChordUp (NoteChord nL r key)
   = NoteChord (noteListUp nL) (r+12) key
 
 -- noteListUp raises all Notes in a list by an octave
--- if any Notes would have been raised out of midi playable range,
--- the original list is returned
 noteListUp :: [Note] -> [Note]
 noteListUp ns = map (+12) ns
 
 -- noteChordDown lowers the given NoteChord by an octave
--- if any Notes would have been lowered out of midi playable range,
--- the original NoteChord is returned
 noteChordDown :: NoteChord -> NoteChord
 noteChordDown (NoteChord nL r key)
   = NoteChord (noteListDown nL) (r-12) key
 
 -- noteListDown lowers all Notes in a list by an octave
--- if any Notes would have been lowered out of midi playable range,
--- the original list is returned
 noteListDown :: [Note] -> [Note]
 noteListDown ns = map (+(-12)) ns
 
