@@ -44,7 +44,9 @@ irAnd :: InRange -> InRange -> InRange
 irAnd High Low = No
 irAnd No _ = No
 irAnd Yes x = x
-irAnd x y = irAnd y x
+irAnd x y
+  | x == y    = x
+  | otherwise = irAnd y x
 
 -- Move type
 -- for tracking whether a chord has moved up or down
