@@ -211,14 +211,29 @@ compUp x y
   | x == y    = y+12
   | otherwise = y
 
--- openChord takes a list of Notes and spreads them out by
--- lowering every other Note (except the last Note) by an octave
--- Notes will not lower out of MIDI playable range
-openChord :: [Note] -> [Note]
-openChord [] = []
-openChord [n] = [n]
-openChord (n:ns) = sort $
-  (noteMidiPlayable (n-12)):(head ns):(openChord (tail ns))
+-- openNoteChord takes a NoteChord and spreads out the entries
+-- in the noteList by lowering every other Note (except the
+-- last one) by an octave
+-- the root of the NoteChord will be updated if it is lowered
+openNoteChord :: NoteChord -> NoteChord
+openNoteChord (NoteChord nL r key)
+  = NoteChord (sort $ fmap f nL) (f r) key
+  where f = listCompDown (everyOtherButLast nL)
+
+-- listCompDown takes a list of numbers and a number x
+-- if x is in the list, it returns x-12
+-- otherwise it returns x
+listCompDown :: (Num a, Eq a) => [a] -> a -> a
+listCompDown list x
+  | x `elem` list = x-12
+  | otherwise     = x
+
+-- everyOtherButLast takes a list and returns the list
+-- containing every other element (except the last one)
+everyOtherButLast :: [a] -> [a]
+everyOtherButLast [] = []
+everyOtherButLast (_:[]) = []
+everyOtherButLast (x:xs) = x:(everyOtherButLast (tail xs))
 
 -- powerChord removes all but the first and last entries in a list
 -- of Notes.
