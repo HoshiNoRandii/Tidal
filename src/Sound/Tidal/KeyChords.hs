@@ -34,12 +34,26 @@ data GenChord = GenChord { sclDeg :: Int
 data NoteChord = NoteChord { noteList :: [Note]
                            , root :: Note
                            , inKey :: Key
-                           } deriving(Show)
+                           } deriving (Show)
+
+-- InRange type
+data InRange = Yes | High | Low | No deriving (Eq, Show)
+
+-- irAnd is defining the logical 'and' operator for InRange values
+irAnd :: InRange -> InRange -> InRange
+irAnd High Low = No
+irAnd No _ = No
+irAnd Yes x = x
+irAnd x y = irAnd y x
+
+-- Move type
+-- for tracking whether a chord has moved up or down
+data Move = Up | Down deriving Eq
 
 -- NCMod type
 -- modifiers for NoteChords
 data NCMod = NInvert | NOpen | NPower | NUp | NDown
-           | NAdd AddWhere (Maybe Int) Int deriving Eq
+           | NAdd AddWhere (Maybe Int) Int deriving (Eq)
 
 instance Show NCMod where
   show NInvert = "NoteChord Invert"
