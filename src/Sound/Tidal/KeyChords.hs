@@ -136,14 +136,41 @@ noteMidiPlayable i
    | otherwise = i
 
 -- isMidiPlayable checks if a Note is within MIDI playable range
-isMidiPlayable :: Note -> Bool
-isMidiPlayable i = (i >= (-72)) && (i <= 55)
+isMidiPlayable :: Note -> InRange
+isMidiPlayable i
+  | i < (-72) = Low
+  | i > 55    = High
+  | otherwise = Yes
 
 -- listIsMidiPlayable checks if a list of Notes are all within
 -- MIDI playable range
-listIsMidiPlayable :: [Note] -> Bool
-listIsMidiPlayable ns = foldr f True ns
-  where f n b = (isMidiPlayable n) && b
+listIsMidiPlayable :: [Note] -> InRange
+listIsMidiPlayable ns = foldr f Yes ns
+  where f n ir = (isMidiPlayable n) `irAnd` ir
+
+-- TODO: make sure this is applied before the chord is played
+-- nChordMidiPlayable takes a NoteChord and if the whole noteList
+-- is within MIDI playable range, returns it,
+-- and if it is not, moves the entire chord up or down octaves until
+-- it is. This includes changing the root and key.
+-- if it is not possible for the entire noteList to be in MIDI
+-- playable range by moving by octaves, an error is thrown
+nChordMidiPlayable :: NoteChord -> NoteChord
+nChordMidiPlayable nc = nChordMidiPlayable' Yes nc
+
+nChordMidiPlayable' :: InRange -> NoteChord -> NoteChord
+nChordMidiPlayable' No _
+  = error "chord is too wide for MIDI playable range"
+nChordMidiPlayable' prevIR (NoteChord nL r (Key ton m))
+  | inRange == High
+    = nChordMidiPlayable' (prevIR `irAnd` inRange) $
+      NoteChord (noteListDown nL) (r-12) (Key (ton-12) m)
+  | inRange == Low
+    = nChordMidiPlayable' (prevIR `irAnd` inRange) $
+      NoteChord (noteListUp nL) (r+12) (Key (ton+12) m)
+  | otherwise
+    = NoteChord nL r (Key ton m)
+  where inRange = listIsMidiPlayable nL
 
 -- applyNCMods takes a NoteChord and a list of NCMods
 -- and applies the NCMods to the noteList in the order
@@ -202,10 +229,7 @@ noteChordUp (NoteChord nL r key)
 -- if any Notes would have been raised out of midi playable range,
 -- the original list is returned
 noteListUp :: [Note] -> [Note]
-noteListUp ns
-  | listIsMidiPlayable nsUp = nsUp
-  | otherwise               = ns
-  where nsUp = map (+12) ns
+noteListUp ns = map (+12) ns
 
 -- noteChordDown lowers the given NoteChord by an octave
 -- if any Notes would have been lowered out of midi playable range,
@@ -220,10 +244,7 @@ noteChordDown (NoteChord nL r key)
 -- if any Notes would have been lowered out of midi playable range,
 -- the original list is returned
 noteListDown :: [Note] -> [Note]
-noteListDown ns
-  | listIsMidiPlayable nsDown = nsDown
-  | otherwise                 = ns
-  where nsDown = map (+(-12)) ns
+noteListDown ns = map (+(-12)) ns
 
 -- noteChordAdd adds a new note to a NoteChord by scale degree
 -- and a semitone adjustment
