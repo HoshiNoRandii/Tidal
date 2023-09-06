@@ -115,7 +115,7 @@ sclDegKeyTriad sd key =
 -- octaves for this purpose).
 sclDegGetNote :: Int -> Key -> Note
 sclDegGetNote sd (Key t mo) =
-  midiPlayable $ Note $ ton + mo!!ind + 12*oct
+  noteMidiPlayable $ Note $ ton + mo!!ind + 12*oct
   where
     ton = unNote t
     len = length mo
@@ -124,16 +124,14 @@ sclDegGetNote sd (Key t mo) =
     ind = (sd-1) `mod` len -- index in the mode
     oct = fromIntegral $ ((sd-1) `div` len) -- octave adjust
 
--- midiPlayable takes a Note and
+-- noteMidiPlayable takes a Note and
 -- if the note is within MIDI playable range, returns it
 -- and if it is not, moves it up or down octaves until it is
-midiPlayable :: Note -> Note
-midiPlayable i
-   | i < (-72) = midiPlayable (i + 12) -- the note is too low, raise it an
-                                       -- octave and try again
-   | i > 55    = midiPlayable (i - 12) -- the note is too high, lower it an
-                                       -- octave and try again
-   | otherwise = i -- the note is MIDI playable, return it
+noteMidiPlayable :: Note -> Note
+noteMidiPlayable i
+   | i < (-72) = noteMidiPlayable (i + 12)
+   | i > 55    = noteMidiPlayable (i - 12)
+   | otherwise = i
 
 -- isMidiPlayable checks if a Note is within MIDI playable range
 isMidiPlayable :: Note -> Bool
@@ -178,7 +176,7 @@ openChord :: [Note] -> [Note]
 openChord [] = []
 openChord [n] = [n]
 openChord (n:ns) = sort $
-  (midiPlayable (n-12)):(head ns):(openChord (tail ns))
+  (noteMidiPlayable (n-12)):(head ns):(openChord (tail ns))
 
 -- powerChord removes all but the first and last entries in a list
 -- of Notes.
@@ -243,7 +241,7 @@ noteChordAdd d st nC
 noteChordAddInt :: Int -> NoteChord -> NoteChord
 noteChordAddInt st (NoteChord nL r key)
   = NoteChord (noteListAddNote toAdd nL) r key
-    where toAdd = midiPlayable $ r+s
+    where toAdd = noteMidiPlayable $ r+s
           s = fromIntegral st
 
 -- noteChordAddSD takes two Ints representing a scale degree and
@@ -266,5 +264,5 @@ noteListAddNote n nL = sort $ n:nL
 -- unless that causes n to leave midi playable range
 noteHigherThan :: Note -> Note -> Note
 noteHigherThan n r
-  | n > r     = midiPlayable n
+  | n > r     = noteMidiPlayable n
   | otherwise = noteHigherThan (n+12) r
