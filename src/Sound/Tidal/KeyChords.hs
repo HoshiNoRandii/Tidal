@@ -134,6 +134,22 @@ sclDegGetNote sd (Key t mo) =
     ind = (sd-1) `mod` len -- index in the mode
     oct = fromIntegral $ ((sd-1) `div` len) -- octave adjust
 
+-- noteGetSclDeg takes a Note and a Key and returns an Int
+-- representing the scale degree of that Note in that Key.
+-- it does not pay attention to octaves, so for instance,
+-- if key = strKey 0 "major",
+-- then noteGetSclDeg 0 key == noteGetSclDeg 12 == 1
+noteGetSclDeg :: Note -> Key -> Int
+noteGetSclDeg n (Key t mo)
+  | degs == [] = error ("note " ++ (show n) ++ " not in key")
+  | otherwise  = (degs!!0)+1 -- +1 because lists are indexed from 0,
+                             -- and scale degree is indexed from 1
+  where toC = n-t
+        resClass = unNote $ toC `rfMod` 12
+        indList = [0..((length mo)-1)]
+        test x = mo!!x == resClass
+        degs = filter test indList
+
 -- noteMidiPlayable takes a Note and
 -- if the note is within MIDI playable range, returns it
 -- and if it is not, moves it up or down octaves until it is
