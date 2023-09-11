@@ -106,7 +106,8 @@ rfMod x y
 -- the modifications applied
 -- the noteList should be sorted in ascending order
 genToNoteChord :: GenChord -> Key -> NoteChord
-genToNoteChord (GenChord sd ms) key = (flip applyNCMods) ms $
+genToNoteChord (GenChord sd ms) key
+  = (flip applyNCMods) ms $
   NoteChord (sclDegKeyTriad sd key) (sclDegGetNote sd key) key
 
 -- sclDegKeyTriad takes an Int representing a scale degree
