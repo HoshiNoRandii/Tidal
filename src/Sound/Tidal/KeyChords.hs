@@ -107,7 +107,7 @@ rfMod x y
 -- the noteList should be sorted in ascending order
 genToNoteChord :: GenChord -> Key -> NoteChord
 genToNoteChord (GenChord sd ms) key
-  = (flip applyNCMods) ms $
+  = applyNCMods ms $
   NoteChord (sclDegKeyTriad sd key) (sclDegGetNote sd key) key
 
 -- sclDegKeyTriad takes an Int representing a scale degree
@@ -193,19 +193,6 @@ nChordMidiPlayable' prevIR (NoteChord nL r (Key ton m))
   | otherwise
     = NoteChord nL r (Key ton m)
   where inRange = listIsMidiPlayable nL
-
--- applyNCMods takes a NoteChord and a list of NCMods
--- and applies the NCMods to the noteList in the order
--- they are listed
-applyNCMods :: NoteChord -> [NCMod] -> NoteChord
-applyNCMods nc [] = nc
-applyNCMods nc (m:ms) = applyNCMods (applyNCMod nc m) ms
-
--- TODO: implement this lmao
--- applyNCMod takes a NoteChord and an NCMod
--- and applies the NCMod to the noteList
-applyNCMod :: NoteChord -> NCMod -> NoteChord
-applyNCMod nc m = nc
 
 
 ------ modifier functions ------
@@ -356,3 +343,24 @@ noteLowerThan :: Note -> Note -> Note
 noteLowerThan n r
   | n < r     = n
   | otherwise = noteLowerThan (n-12) r
+
+
+------- functions that interface with the parser ------
+
+-- applyNCMods takes a NoteChord and a list of NCMods
+-- and applies the NCMods to the noteList in the order
+-- they are listed
+applyNCMods :: [NCMod] -> NoteChord -> NoteChord
+applyNCMods [] nc = nc
+applyNCMods (m:ms) nc = applyNCMods ms (applyNCMod m nc)
+
+-- applyNCMod takes an NCMod and a NoteChord
+-- and applies the NCMod to the NoteChord
+applyNCMod :: NCMod -> NoteChord -> NoteChord
+applyNCMod NInvert = invertNoteChord
+applyNCMod NOpen = openNoteChord
+applyNCMod NPower = powerNoteChord
+applyNCMod NUp = noteChordUp
+applyNCMod NDown = noteChordDown
+applyNCMod (NAdd Treble i st) = noteChordAdd i st
+applyNCMod (NAdd Bass i st) = noteChordAddBass i st
