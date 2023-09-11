@@ -320,6 +320,24 @@ noteChordAdd d st (NoteChord nL r key)
       | otherwise
         = ((sclDegGetNote (fromJust d) key)+s) `noteHigherThan` r
 
+-- noteChordAddBass adds a new note to a note to the bass of
+-- a NoteChord by scale degree and a semitone adjustment
+-- if the given scale degree is Nothing, it defaults to the
+-- root of the given chord
+-- the new note is added at the bottom of the noteList
+-- assumes the noteList is sorted
+noteChordAddBass :: Maybe Int -> Int -> NoteChord -> NoteChord
+noteChordAddBass d st (NoteChord nL r key)
+  = NoteChord (noteListAddNote toAdd nL) r key
+  where
+    s = fromIntegral st
+    toAdd
+      | d == Nothing
+        = (r+s) `noteLowerThan` (nL!!0)
+      | otherwise
+        = ((sclDegGetNote (fromJust d) key)+s)
+          `noteLowerThan` (nL!!0)
+
 -- noteListAddNote takes a Note to add to a list of Notes
 -- the list will remain sorted
 noteListAddNote :: Note -> [Note] -> [Note]
@@ -331,3 +349,10 @@ noteHigherThan :: Note -> Note -> Note
 noteHigherThan n r
   | n > r     = n
   | otherwise = noteHigherThan (n+12) r
+
+-- noteLowerThan takes a Note n and a reference Note r
+-- and makes sure n is lower than r, moving it by octaves
+noteLowerThan :: Note -> Note -> Note
+noteLowerThan n r
+  | n < r     = n
+  | otherwise = noteLowerThan (n-12) r
