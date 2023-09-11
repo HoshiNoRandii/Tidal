@@ -257,13 +257,13 @@ everyOtherButLast [] = []
 everyOtherButLast (_:[]) = []
 everyOtherButLast (x:xs) = x:(everyOtherButLast (tail xs))
 
--- noteChordPower removes all Notes from a NoteChord that are not
+-- powerNoteChord removes all Notes from a NoteChord that are not
 -- (up to octaves) the root or the "fifth"
 -- here, the "fifth" is the Note 4 scale degrees above the root
 -- in a western seven-note scale, this produces a "power chord,"
 -- hence the name
-noteChordPower :: NoteChord -> NoteChord
-noteChordPower (NoteChord nL r k)
+powerNoteChord :: NoteChord -> NoteChord
+powerNoteChord (NoteChord nL r k)
   = NoteChord (filter test nL) r k
   where test = inPower (NoteChord nL r k)
 
