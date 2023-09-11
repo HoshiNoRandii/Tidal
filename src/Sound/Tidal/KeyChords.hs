@@ -364,6 +364,19 @@ applyNCMod NUp = noteChordUp
 applyNCMod NDown = noteChordDown
 applyNCMod (NAdd Treble i st) = noteChordAdd i st
 applyNCMod (NAdd Bass i st) = noteChordAddBass i st
+-- genChordToPatSeq takes a Pattern of Ints
+-- representing scale Degrees
+-- and a list of Patterns of list of NCMods
+-- and returns a Pattern of GenChords
+-- (expect that the function (GenChord -> a) is id)
+genChordToPatSeq :: (Pattern t) => (GenChord -> a) -> t Int -> [t [NCMod]] -> t a
+genChordToPatSeq f degP modsP = do
+                                  d <- degP
+                                  ms <- modsListTypeHelper modsP
+                                  return (f $ GenChord d ms)
+
+modsListTypeHelper :: (Pattern t) => [t [a]] -> t [a]
+modsListTypeHelper x = concat <$> sequence x
 
 -- semiFromInterval takes a Char and an Int representing an interval
 -- (i.e., 'm' and 3 to represent a minor third)
