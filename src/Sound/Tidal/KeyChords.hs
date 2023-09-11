@@ -259,14 +259,34 @@ everyOtherButLast [] = []
 everyOtherButLast (_:[]) = []
 everyOtherButLast (x:xs) = x:(everyOtherButLast (tail xs))
 
--- powerChord removes all but the first and last entries in a list
--- of Notes.
--- When this is the first modifier applied to a triad built from a
--- 7 note scale, it produces a power chord (hence the name)
-powerChord :: [Note] -> [Note]
-powerChord [] = []
-powerChord [n] = [n]
-powerChord ns = (head ns):(last ns):[]
+-- noteChordPower removes all Notes from a NoteChord that are not
+-- (up to octaves) the root or the "fifth"
+-- here, the "fifth" is the Note 4 scale degrees above the root
+-- in a western seven-note scale, this produces a "power chord,"
+-- hence the name
+noteChordPower :: NoteChord -> NoteChord
+noteChordPower (NoteChord nL r k)
+  = NoteChord (filter test nL) r k
+  where test = inPower (NoteChord nL r k)
+
+-- inPower checks if the given Note should be in the power chord
+-- version of the given NoteChord
+inPower :: NoteChord -> Note -> Bool
+inPower nC n = (isRoot nC n) || (isFifth nC n)
+
+-- isRoot checks if the given Note is the root (or an octave
+-- adusted version of it) of the given NoteChord
+isRoot :: NoteChord -> Note -> Bool
+isRoot (NoteChord nL r k) n = (n `rfMod` 12) == (r `rfMod` 12)
+
+-- isFifth checks if the given Note is the "fifth" (or an octave
+-- adjusted version of it) of the given NoteChord
+-- here the "fifth" is the Note 4 scale degrees above the root
+isFifth :: NoteChord -> Note -> Bool
+isFifth (NoteChord nL r k) n
+  = (n `rfMod` 12) == (fifth `rfMod` 12)
+  where fifth = sclDegGetNote (rootDeg+4) k
+        rootDeg = noteGetSclDeg r k
 
 -- noteChordUp raises the given NoteChord by an octave
 noteChordUp :: NoteChord -> NoteChord
