@@ -121,11 +121,8 @@ sclDegKeyTriad sd key =
 -- scale degree in that Key.
 -- Note that it pays attention to octaves, so for instance,
 -- sclDegKeyTriad 8 (strKey c4 "major") == c5.
--- Only returns Notes in a MIDI playable range (will ignore
--- octaves for this purpose).
 sclDegGetNote :: Int -> Key -> Note
-sclDegGetNote sd (Key t mo) =
-  noteMidiPlayable $ Note $ ton + mo!!ind + 12*oct
+sclDegGetNote sd (Key t mo) = Note $ ton + mo!!ind + 12*oct
   where
     ton = unNote t
     len = length mo
