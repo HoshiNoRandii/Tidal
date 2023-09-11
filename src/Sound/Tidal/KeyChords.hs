@@ -89,6 +89,14 @@ strKey ton modeStr
   | otherwise        = error "Mode not available"
   where jMode = lookup modeStr scaleTable
 
+-- rfMod is a version of the mod function that takes
+-- RealFrac inputs
+-- for integral inputs, x `rfMod` y == x `mod` y
+rfMod :: (RealFrac a, Eq a) => a -> a -> a
+rfMod x y
+  | y == 0    = error "division by 0"
+  | otherwise = x - (div * y)
+  where div = fromIntegral $ floor $ x/y
 
 ------ main functions ------
 
