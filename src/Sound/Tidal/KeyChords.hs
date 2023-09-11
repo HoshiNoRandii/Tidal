@@ -364,3 +364,51 @@ applyNCMod NUp = noteChordUp
 applyNCMod NDown = noteChordDown
 applyNCMod (NAdd Treble i st) = noteChordAdd i st
 applyNCMod (NAdd Bass i st) = noteChordAddBass i st
+
+-- semiFromInterval takes a Char and an Int representing an interval
+-- (i.e., 'm' and 3 to represent a minor third)
+-- and returns the number of semitones in that interval
+semiFromInterval :: Char -> Int -> Int
+semiFromInterval name num
+   = (semiFromInterMod7 name numClass) + 12*numOcts
+     where
+        (numOcts, numClass) = divMod num 7
+
+-- semiFromInterMod7 takes a Char and an Int representing an interval
+-- (here, the Int must be between 0 and 6 inclusive)
+-- and returns the number of semitones in that interval
+-- note that 0 represents a 7th, but an octave down
+-- as divMod 7 7 = (1, 0) (see semiFromInterval)
+semiFromInterMod7 :: Char -> Int -> Int
+semiFromInterMod7 'm'  nC = case nC of
+                               2 -> 1
+                               3 -> 3
+                               6 -> 8
+                               0 -> 10-12
+                               _ -> error ("unknown interval m" ++ show nC)
+semiFromInterMod7 'M'  nC = case nC of
+                               2 -> 2
+                               3 -> 4
+                               6 -> 9
+                               0 -> 11-12
+                               _ -> error ("unknown interval M" ++ show nC)
+semiFromInterMod7 'd'  nC = case nC of
+                               3 -> 2
+                               4 -> 4
+                               5 -> 6
+                               6 -> 7
+                               0 -> 9-12
+                               _ -> error ("unknown interval d" ++ show nC)
+semiFromInterMod7 'A'  nC = case nC of
+                               2 -> 3
+                               3 -> 5
+                               4 -> 6
+                               5 -> 8
+                               6 -> 10
+                               _ -> error ("unknown interval A" ++ show nC)
+semiFromInterMod7 'P'  nC = case nC of
+                               1 -> 0
+                               4 -> 5
+                               5 -> 7
+                               _ -> error ("unknown interval P" ++ show nC)
+semiFromInterMod7 name nC = error ("unknown interval " ++ [name] ++ show nC)
