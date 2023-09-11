@@ -194,6 +194,24 @@ nChordMidiPlayable' prevIR (NoteChord nL r (Key ton m))
     = NoteChord nL r (Key ton m)
   where inRange = listIsMidiPlayable nL
 
+-- applyNCMods takes a NoteChord and a list of NCMods
+-- and applies the NCMods to the noteList in the order
+-- they are listed
+applyNCMods :: [NCMod] -> NoteChord -> NoteChord
+applyNCMods [] nc = nc
+applyNCMods (m:ms) nc = applyNCMods ms (applyNCMod m nc)
+
+-- applyNCMod takes an NCMod and a NoteChord
+-- and applies the NCMod to the NoteChord
+applyNCMod :: NCMod -> NoteChord -> NoteChord
+applyNCMod NInvert = invertNoteChord
+applyNCMod NOpen = openNoteChord
+applyNCMod NPower = powerNoteChord
+applyNCMod NUp = noteChordUp
+applyNCMod NDown = noteChordDown
+applyNCMod (NAdd Treble i st) = noteChordAdd i st
+applyNCMod (NAdd Bass i st) = noteChordAddBass i st
+
 
 ------ modifier functions ------
 
@@ -347,23 +365,6 @@ noteLowerThan n r
 
 ------- functions that interface with the parser ------
 
--- applyNCMods takes a NoteChord and a list of NCMods
--- and applies the NCMods to the noteList in the order
--- they are listed
-applyNCMods :: [NCMod] -> NoteChord -> NoteChord
-applyNCMods [] nc = nc
-applyNCMods (m:ms) nc = applyNCMods ms (applyNCMod m nc)
-
--- applyNCMod takes an NCMod and a NoteChord
--- and applies the NCMod to the NoteChord
-applyNCMod :: NCMod -> NoteChord -> NoteChord
-applyNCMod NInvert = invertNoteChord
-applyNCMod NOpen = openNoteChord
-applyNCMod NPower = powerNoteChord
-applyNCMod NUp = noteChordUp
-applyNCMod NDown = noteChordDown
-applyNCMod (NAdd Treble i st) = noteChordAdd i st
-applyNCMod (NAdd Bass i st) = noteChordAddBass i st
 -- genChordToPatSeq takes a Pattern of Ints
 -- representing scale Degrees
 -- and a list of Patterns of list of NCMods
