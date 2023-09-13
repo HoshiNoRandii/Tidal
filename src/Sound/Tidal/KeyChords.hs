@@ -94,8 +94,8 @@ patStrKey = liftA2 strKey
 rfMod :: (RealFrac a, Eq a) => a -> a -> a
 rfMod x y
   | y == 0    = error "division by 0"
-  | otherwise = x - (div * y)
-  where div = fromIntegral $ floor $ x/y
+  | otherwise = x - (d * y)
+  where d = fromInteger $ floor $ x/y
 
 ------ main functions ------
 
@@ -303,13 +303,13 @@ inPower nC n = (isRoot nC n) || (isFifth nC n)
 -- isRoot checks if the given Note is the root (or an octave
 -- adusted version of it) of the given NoteChord
 isRoot :: NoteChord -> Note -> Bool
-isRoot (NoteChord nL r k) n = (n `rfMod` 12) == (r `rfMod` 12)
+isRoot (NoteChord _ r _) n = (n `rfMod` 12) == (r `rfMod` 12)
 
 -- isFifth checks if the given Note is the "fifth" (or an octave
 -- adjusted version of it) of the given NoteChord
 -- here the "fifth" is the Note 4 scale degrees above the root
 isFifth :: NoteChord -> Note -> Bool
-isFifth (NoteChord nL r k) n
+isFifth (NoteChord _ r k) n
   = (n `rfMod` 12) == (fifth `rfMod` 12)
   where fifth = sclDegGetNote (rootDeg+4) k
         rootDeg = noteGetSclDeg r k
