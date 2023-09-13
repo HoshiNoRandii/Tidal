@@ -48,10 +48,6 @@ irAnd x y
   | x == y    = x
   | otherwise = irAnd y x
 
--- Move type
--- for tracking whether a chord has moved up or down
-data Move = Up | Down deriving Eq
-
 -- NCMod type
 -- modifiers for NoteChords
 data NCMod = NInvert | NOpen | NPower | NUp | NDown
@@ -183,15 +179,6 @@ noteGetSclDeg n (Key t mo)
         indList = [0..((length mo)-1)]
         test x = mo!!x == resClass
         degs = filter test indList
-
--- noteMidiPlayable takes a Note and
--- if the note is within MIDI playable range, returns it
--- and if it is not, moves it up or down octaves until it is
-noteMidiPlayable :: Note -> Note
-noteMidiPlayable i
-   | i < (-72) = noteMidiPlayable (i + 12)
-   | i > 55    = noteMidiPlayable (i - 12)
-   | otherwise = i
 
 -- isMidiPlayable checks if a Note is within MIDI playable range
 isMidiPlayable :: Note -> InRange
