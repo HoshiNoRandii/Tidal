@@ -89,6 +89,9 @@ strKey ton modeStr
   | otherwise        = error "Mode not available"
   where jMode = lookup modeStr scaleTable
 
+patStrKey :: (Pattern t) => t Note -> t String -> t Key
+patStrKey = liftA2 strKey
+
 -- rfMod is a version of the mod function that takes
 -- RealFrac inputs
 -- for integral inputs, x `rfMod` y == x `mod` y
@@ -100,6 +103,36 @@ rfMod x y
 
 ------ main functions ------
 
+
+
+-- keyChords takes a Pattern of Notes indicating tonics,
+-- a Pattern of Strings indicating modes,
+-- and a Pattern of GenChords
+-- and returns a Pattern ValueMap
+keyChords :: (Pattern t) => t Note -> t String -> t GenChord -> t ValueMap
+keyChords tonP modeP gChordP = note $ patNChordToNotes
+                             $ patGenToNoteChord gChordP keyP
+  where keyP = patStrKey tonP modeP
+
+-- patNChordToNotes takes a Pattern of NoteChords
+-- and returns the Pattern of Notes
+patNChordToNotes :: (Pattern t) => t NoteChord -> t Note
+patNChordToNotes nC = uncollect $ fmap noteList nC
+
+-- midiKeyChords does the same thing as keyChords, but chords
+-- are first moved into Midi playable range
+midiKeyChords :: (Pattern t) => t Note -> t String -> t GenChord -> t ValueMap
+midiKeyChords tonP modeP gChordP = note $ patNChordToMidiNotes
+                                 $ patGenToNoteChord gChordP keyP
+  where keyP = patStrKey tonP modeP
+
+-- patNChordToMidiNotes takes a Pattern of NoteChords
+-- moves all the NoteChords into midi playable range
+-- and then returns the Pattern of Notes
+patNChordToMidiNotes :: (Pattern t) => t NoteChord -> t Note
+patNChordToMidiNotes nC = uncollect $
+                          fmap (noteList . nChordMidiPlayable) nC
+
 -- genToNoteChord takes a GenChord and a Key and returns
 -- the corresponding NoteChord, whose noteList corresponds to
 -- the triad build on the sclDeg in the given Key, with
@@ -109,6 +142,9 @@ genToNoteChord :: GenChord -> Key -> NoteChord
 genToNoteChord (GenChord sd ms) key
   = applyNCMods ms $
   NoteChord (sclDegKeyTriad sd key) (sclDegGetNote sd key) key
+
+patGenToNoteChord :: (Pattern t) => t GenChord -> t Key -> t NoteChord
+patGenToNoteChord = liftA2 genToNoteChord
 
 -- sclDegKeyTriad takes an Int representing a scale degree
 -- and a Key and returns a list of three Notes corresponding
