@@ -51,6 +51,7 @@ import           Sound.Tidal.Signal.Random              (_degradeByUsing,
 import           Sound.Tidal.Types
 import           Sound.Tidal.Utils                      (fromRight)
 import           Sound.Tidal.Value
+import           Sound.Tidal.KeyChords
 
 data TidalParseError = TidalParseError {parsecError :: ParseError,
                                         code        :: String
@@ -85,6 +86,9 @@ data TPat a where
    TPat_EnumFromTo :: TPat a -> TPat a -> TPat a
    TPat_Var :: String -> TPat a
    TPat_Chord :: (Num b, Enum b, Parseable b, Enumerable b) => (b -> a) -> TPat b -> TPat String -> [TPat [Modifier]] -> TPat a
+   -- TPat_GenChord (func) (scale degrees) ([modifiers])
+   -- note that typically a is GenChord, with (func) = id
+   TPat_GenChord :: (GenChord -> a) -> TPat Int -> [TPat [NCMod]] -> TPat a
 
 instance Show a => Show (TPat a) where
   show (TPat_Atom c v) = "TPat_Atom (" ++ show c ++ ") (" ++ show v ++ ")"
@@ -102,6 +106,7 @@ instance Show a => Show (TPat a) where
   show (TPat_EnumFromTo a b) = "TPat_EnumFromTo (" ++ show a ++ ") (" ++ show b ++ ")"
   show (TPat_Var s) = "TPat_Var " ++ show s
   show (TPat_Chord g iP nP msP) = "TPat_Chord (" ++ show (fmap g iP) ++ ") (" ++ show nP ++ ") (" ++ show msP ++ ")"
+  show (TPat_GenChord f degsP modsP) = "TPat_GenChord (" ++ show f ++ ") (" ++ show degsP ++ ") (" ++ show modsP ++ ")"
 
 instance Functor TPat where
   fmap f (TPat_Atom c v) = TPat_Atom c (f v)
@@ -119,6 +124,7 @@ instance Functor TPat where
   fmap f (TPat_EnumFromTo a b) = TPat_EnumFromTo (fmap f a) (fmap f b)
   fmap _ (TPat_Var s) = TPat_Var s
   fmap f (TPat_Chord g iP nP msP) = TPat_Chord (f . g) iP nP msP
+  fmap f (TPat_GenChord g degsP modsP) = TPat_GenChord (f . g) degsP modsP
 
 tShowList :: (Show a) => [TPat a] -> String
 tShowList vs = "[" ++ intercalate "," (map tShow vs) ++ "]"
@@ -149,6 +155,7 @@ tShow TPat_Silence = "silence"
 tShow (TPat_EnumFromTo a b) = "mixJoin $ fromTo <$> (" ++ tShow a ++ ") <*> (" ++ tShow b ++ ")"
 tShow (TPat_Var s) = "getControl " ++ s
 tShow (TPat_Chord f n name mods) = "chord (" ++ tShow (fmap f n) ++ ") (" ++ tShow name ++ ")" ++ tShowList mods
+tShow (TPat_GenChord f degsP modsP) = "genchord (" ++ show f ++ ") (" ++ tShow degsP ++ ") (" ++ tShowList modsP ++ ")"
 tShow a = "can't happen? " ++ show a
 
 
@@ -176,9 +183,9 @@ toPat = \case
    TPat_Var s -> getControl s
    TPat_Chord f iP nP mP -> chordToPatSeq f (toPat iP) (toPat nP) (map toPat mP)
    p@(TPat_Repeat _ _) -> toPat $ TPat_Seq [p] --this is a bit of a hack
+   TPat_GenChord f degsP modsP -> genChordToPatSeq f (toPat degsP) (map toPat modsP)
    _ -> silence
-
-
+   
 toSeq :: (Parseable a, Enumerable a) => TPat a -> Sequence a
 toSeq = \case
    TPat_Atom (Just loc) x -> S.addMetadata (Metadata [loc]) $ S.step 1 x
@@ -470,7 +477,7 @@ pDoubleWithoutChord = pTPatF $ wrapPos $ do s <- sign
 
 pNote :: MyParser (TPat Note)
 pNote = try $ do n <- pNoteWithoutChord
-                 pChord n <|> return n
+                 pChord n <|>  return n
         <|> pChord (TPat_Atom Nothing 0)
         <|> pNoteWithoutChord
         <|> do TPat_Atom Nothing . fromRational <$> pRatio
@@ -766,3 +773,125 @@ pChord i = do
     n <- pTPat <?> "chordname"
     ms <- option [] $ many1 (char '\'' >> pTPat)
     return $ TPat_Chord id i n ms
+
+
+-- parsing GenChords
+
+instance Parseable GenChord where
+   tPatParser = pGenChord
+   doEuclid = euclidOff
+
+instance Enumerable GenChord where
+   fromTo a b = fastFromList [a,b]
+   fromThenTo a b c = fastFromList [a,b,c]
+
+pGenChord :: MyParser (TPat GenChord)
+pGenChord = try $ do
+                  i <- pIntegralWithoutChord :: (MyParser (TPat Int))
+                  parseGenChord i
+
+parseGenChord :: TPat Int -> MyParser (TPat GenChord)
+parseGenChord i = do
+   ms <- option [] $ many1 (char '-' >> pTPat) -- parse modifiers
+   return $ TPat_GenChord id i ms
+
+instance Parseable [NCMod] where
+   tPatParser = pNCMods
+   doEuclid = euclidOff
+
+instance Enumerable [NCMod] where
+   fromTo a b = fastFromList [a,b]
+   fromThenTo a b c = fastFromList [a,b,c]
+
+pNCMods :: MyParser (TPat [NCMod])
+pNCMods = wrapPos $ TPat_Atom Nothing <$> parseNCMods
+
+parseNCMods:: MyParser [NCMod]
+parseNCMods =   parseNCModPower
+            <|> parseNCModAddTreb
+            <|> try parseNCModInvNum
+            <|> many1 parseNCModInv
+            <|> many1 parseNCModOpen
+            <|> try parseNCModUpNum
+            <|> many1 parseNCModUp
+            <|> try parseNCModDownNum
+            <|> many1 parseNCModDown
+            <|> parseNCModAddBass
+            <?> "modifier"
+
+parseNCModPower :: MyParser [NCMod]
+parseNCModPower = char 'p' >> return [NPower]
+
+parseNCModAddTreb :: MyParser [NCMod]
+parseNCModAddTreb = char 'a' >> (parseNCModAddTSD <|> parseNCModAddTInt)
+
+parseNCModAddTSD :: MyParser [NCMod]
+parseNCModAddTSD = do
+                      char 'S'
+                      i <- pInteger
+                      accs <- many accidentals
+                      let st = foldr (+) 0 accs
+                      return [(NAdd Treble (Just (round i)) st)]
+                   where
+                      accidentals :: MyParser Int
+                      accidentals = choice [char 's' >> return 1,
+                                            char 'f' >> return (-1)]
+
+parseNCModAddTInt :: MyParser [NCMod]
+parseNCModAddTInt = do
+                       intName <- letter
+                       intNum <- pInteger
+                       let st  = semiFromInterval intName (round intNum)
+                       return [(NAdd Treble Nothing st)]
+
+parseNCModInv :: MyParser NCMod
+parseNCModInv = char 'i' >> return NInvert
+
+parseNCModInvNum :: MyParser [NCMod]
+parseNCModInvNum = do
+                      char 'i'
+                      n <- pInteger
+                      return $ replicate (round n) NInvert
+
+parseNCModOpen :: MyParser NCMod
+parseNCModOpen = char 'o' >> return NOpen
+
+parseNCModUp :: MyParser NCMod
+parseNCModUp = char 'u' >> return NUp
+
+parseNCModUpNum :: MyParser [NCMod]
+parseNCModUpNum = do
+              char 'u'
+              n <- pInteger
+              return $ replicate (round n) NUp
+
+parseNCModDown :: MyParser NCMod
+parseNCModDown = char 'd' >> return NDown
+
+parseNCModDownNum :: MyParser [NCMod]
+parseNCModDownNum = do
+              char 'd'
+              n <- pInteger
+              return $ replicate (round n) NDown
+
+parseNCModAddBass :: MyParser [NCMod]
+parseNCModAddBass = char 'b' >> (parseNCModAddBSD <|> parseNCModAddBInt)
+
+parseNCModAddBSD :: MyParser [NCMod]
+parseNCModAddBSD = do
+                      char 'S'
+                      i <- pInteger
+                      accs <- many accidentals
+                      let st = foldr (+) 0 accs
+                      return [(NAdd Bass (Just (round i)) st)]
+                   where
+                      accidentals :: MyParser Int
+                      accidentals = choice [char 's' >> return 1,
+                                            char 'f' >> return (-1)]
+
+parseNCModAddBInt :: MyParser [NCMod]
+parseNCModAddBInt = do
+                       intName <- letter
+                       intNum <- pInteger
+                       let st  = semiFromInterval intName (round intNum)
+                       return [(NAdd Bass Nothing st)]

@@ -64,6 +64,7 @@ library
                        Sound.Tidal.Value
                        Sound.Tidal.Version
                        Paths_tidal
+                       Sound.Tidal.KeyChords
   Build-depends:
       base >=4.8 && <5
     , containers < 0.7

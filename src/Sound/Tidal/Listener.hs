@@ -1,6 +1,6 @@
 module Sound.Tidal.Listener where
 
-import Sound.OSC.FD as O
+import Sound.Osc.Fd as O
 
 listenPort = 6011
 
@@ -14,6 +14,6 @@ listen = do udp <- udpServer "127.0.0.1" listenPort
                      loop udp
 
 
-act :: UDP -> Maybe O.Message -> IO ()
+act :: Udp -> Maybe O.Message -> IO ()
 act _ _ = putStrLn "aha"
   
