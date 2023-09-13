@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 
-module Sound.Tidal.KeyChords where
+module Sound.Tidal.KeyChords ( GenChord(..), NCMod(..), AddWhere(..), keyChords, midiKeyChords, genChordToPatSeq, semiFromInterval) where
 
 {-
    This is HoshiNoRandii's module to implement chords in TidalCycles in
