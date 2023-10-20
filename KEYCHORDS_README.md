@@ -10,7 +10,7 @@ The type signature is as follows:
 ```haskell
 keyChords :: (Pattern t) => t Note -> t String -> t GenChord -> t ValueMap
 ```
-The GenChord type stores the scale degree of tonic and all chord modifications rather than the individual notes in the chord. 
+The `GenChord` type stores the scale degree of tonic and all chord modifications rather than the individual notes in the chord. 
 The conversion to notes happens last, in order to keep other operations fully independent of selected scale.
 
 Example useage:
@@ -79,3 +79,8 @@ Use interval notations to add by interval above the root.
 For example, `5-am7` would build a chord on the 5th scale degree and then add
 the note that is a minor 7th above the 5th scale degree (creating a dominant
 7th chord).
+
+## Backwards-Compatibility
+
+Despite many additions to the parser, this is a backwards compatible change.
+The new parse functions are only called when a string is coerced to a `Pattern GenChord`, which is not a type expected by any previously existing Tidal functions.
